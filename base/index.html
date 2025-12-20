@@ -1,0 +1,1400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Server Panel</title>
+
+<style>
+  :root{
+    --bg:#0f0f0f;
+    --panel:#141414;
+    --muted:#bfc7cf;
+    --accent:#5ddcff;
+    --card-border:#222;
+  }
+
+  html,body{height:100%;margin:0;background:var(--bg);color:#e8eef2;font-family:Segoe UI,Arial,Helvetica,sans-serif}
+  .wrap{display:flex;flex-direction:column;}
+
+/* TOP BAR */
+  .topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background: #161616;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.status-left {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.status-title {
+  color: var(--accent);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.usage-bars {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.usage-bar {
+  position: relative;
+  width: 250px;       /* full length of the bar */
+  height: 25px;       /* fixed height */
+  background: #222;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.03);
+  display: flex;
+  flex-direction: row; /* horizontal fill */
+  align-items: center; /* vertical center for label if needed */
+}
+
+.usage-bar .fill {
+  height: 100%;       /* full height of the bar */
+  width: 0%;          /* dynamic width set via JS */
+  border-radius: 6px 0 0 6px; /* rounded left side */
+  background-color: green;
+  transition: width 0.35s ease, background-color 0.35s ease;
+
+  /* Ensure left alignment */
+  align-self: stretch; /* fill the bar height */
+  margin: 0;           /* remove any default margin */
+}
+
+.usage-label {
+  position: absolute;
+  bottom: 0; /* display at bottom of bar */
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+  pointer-events: none;
+  margin-bottom: 2%;
+}
+
+/* Optional: small title above bar (RAM/CPU) */
+.usage-bar .bar-title {
+  position: absolute;
+  top: -16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+
+  .controls{display:flex;gap:8px}
+  .btn{background:#222;border:1px solid #333;padding:8px 12px;border-radius:6px;color:#eee;cursor:pointer}
+  .btn:hover{background:#2e2e2e}
+  .btn.start{background:#1f8a3e}
+  .btn.stop{background:#a83a3a}
+  .btn.restart{background:#b8701a}
+
+/* MAIN: left console centered vertically, right file browser */
+  .main{
+    display:flex;
+    gap:14px;
+    flex:1;
+    padding:16px;
+    
+    justify-content:stretch;
+  }
+
+  /* left: terminal */
+  .terminal {
+    width:50%;
+    background:linear-gradient(180deg,#0b0b0b,#131313);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    height:75vh;
+  }
+  .terminal .title{color:var(--accent);font-weight:600;margin-bottom:8px}
+  #console-output{
+    flex:1;
+    background:#000;
+    color:#48ff6b;
+    font-family:monospace;
+    font-size:13px;
+    padding:12px;
+    border-radius:6px;
+    overflow:auto;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.6);
+    white-space:pre-wrap;
+    line-height:1.25;
+  }
+  .console-input-row{display:flex;gap:8px;margin-top:10px}
+  #console-input{
+    flex:1;padding:8px;border-radius:6px;border:1px solid #222;background:#0e0e0e;color:#fff;font-family:monospace;
+  }
+  .small-btn{padding:8px 10px;border-radius:6px;border:1px solid #333;background:#1f1f1f;color:#eee;cursor:pointer}
+  .small-btn:hover{background:#2b2b2b}
+
+  /* right: file browser */
+  .file-browser{
+    width:50%;
+    background:var(--panel);
+    border:1px solid var(--card-border);
+    border-radius:10px;
+    padding:12px;
+    display:flex;
+    flex-direction:column;
+    height:75vh;
+  }
+  .file-browser .title{color:var(--accent);font-weight:600;margin-bottom:8px}
+  #file-list{
+    flex:1;
+    overflow:auto;
+    background:#0b0b0b;
+    padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)
+  }
+  .file-item{
+    display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:6px;margin-bottom:8px;background:#151515;border:1px solid rgba(255,255,255,0.02)
+  }
+  .file-item .meta{color:#cfd7df;font-size:13px}
+  .file-controls{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  input[type="file"]{background:#111;color:#fff;padding:6px;border-radius:6px}
+  input[type="text"]{padding:8px;border-radius:6px;border:1px solid #222;background:#0f0f0f;color:#fff}
+  .action-btn{padding:8px 10px;border-radius:6px;border:1px solid #333;background:#1f1f1f;color:#fff;cursor:pointer}
+  .action-btn:hover{background:#2b2b2b}
+
+  /* responsive */
+  @media (max-width:980px){
+    .main{flex-direction:column;align-items:stretch;padding:10px}
+    .terminal,.file-browser{width:100%;height:60vh}
+  }
+</style>
+</head>
+<body style="overflow-x: hidden;">
+  <div class="wrap">
+        <div class="topbar">
+            <div class="status-left">
+                <div class="status-title">Server Status</div>
+                <div class="usage-bars">
+        
+                    <!-- RAM Bar -->
+                    <div class="usage-bar" title="RAM">
+                        <div class="fill" id="ram-fill"></div>
+                        <div class="usage-label" id="ram-percent" style="font-weight:bold; color:#fff;">0.0%</div>
+                        <div class="bar-title">RAM</div>
+                    </div>
+        
+                    <!-- CPU Bar -->
+                    <div class="usage-bar" title="CPU">
+                        <div class="fill" id="cpu-fill"></div>
+                        <div class="usage-label" id="cpu-percent" style="font-weight:bold; color:#fff;">0.0%</div>
+                        <div class="bar-title">CPU</div>
+                    </div>
+        
+                </div>
+            </div>
+        
+            <div class="controls">
+              <button id="login-btn" onclick="window.open(window.location.origin + '/discordLogin');" class="action-btn">Login</button>
+                <button id="start-btn" class="btn start">Start</button>
+                <button id="stop-btn" class="btn stop">Stop</button>
+                <button id="restart-btn" class="btn restart">Restart</button>
+            </div>
+        </div>
+
+   
+    </div>
+     <div id="tabs" style="height: 30px; width: 100%; margin-left: 15px; margin-right: 15px; margin-top: 10px; overflow: hidden;">
+      <div class="tab" onclick="currentTab = 0; updateTabs();" style="background: #3b4548; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.3%; display: inline-block; margin-right: 5px;">main</div>
+      <div class="tab" onclick="currentTab = 1; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">tools</div>
+      <div class="tab" onclick="currentTab = 2; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">config</div>
+      <div class="tab" onclick="currentTab = 3; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">backups</div>
+      <div class="tab" onclick="currentTab = 4; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">instances</div>
+     
+    </div>
+    <div class="main"
+      style="margin-left: 15px; margin-right: 15px; padding-top: 5px; border-radius: 0px 5px 0px 0px; background: linear-gradient(180deg, rgba(59, 69, 72, 1) 0%, rgba(22, 22, 22, 1) 100%);">
+      <section class="terminal" aria-label="Console">
+        <div class="title">Console</div>
+        <div id="console-output" role="log" aria-live="polite" style="scrollbar-color: #282828 #151515;"></div>
+    
+        <div class="console-input-row">
+          <input id="console-input" placeholder="Type command and press Enter (e.g. say hello, stop)" autocomplete="off" />
+          <button id="send-btn" class="small-btn">Send</button>
+        </div>
+      </section>
+      <aside class="file-browser" aria-label="File browser">
+        <div id="pathDisplay" class="title">Server Files (/server)</div>
+    
+        <!-- File list -->
+        <ul id="file-list" aria-live="polite"
+          style="list-style:none; padding:0; margin:0; overflow-y:auto; scrollbar-color: #282828 #151515; padding: 5px;">
+          <li>Loading files...</li>
+        </ul>
+    
+        <!-- Editor for file content -->
+    
+        <div id="editor-controls"
+          style="display:none; margin-top:5px; display:flex; gap:5px; border-radius: 5px 5px 0px 0px; border-style: solid; border-color: #222222; border-width: 1px; padding: 5px">
+          <div class="title" id="editor-filename" style="padding-top: 1%; width: 100%; margin-left: 10px;">Filename</div>
+          <button id="save-btn" class="action-btn">Save</button>
+          <button id="cancel-btn" class="action-btn">Cancel</button>
+        </div>
+        <textarea id="file-editor"
+          style="width:100%; height:200px; display:none; margin-top:10px; background-color: #151515; color: white; scrollbar-color: #282828 #151515;"></textarea>
+    
+        <!-- File actions -->
+        <div class="file-controls" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; align-items:center;">
+          <input id="file-upload" type="file" />
+          <button id="upload-btn" class="action-btn">Upload</button>
+    
+          <input id="new-file-name" type="text" placeholder="newfile.txt" />
+          <button id="create-btn" class="action-btn">Create</button>
+    
+    
+          <button id="refresh-btn" class="action-btn">Refresh</button>
+        </div>
+      </aside>
+    
+    </div>
+    <div class="tools" style="margin-left: 15px; margin-right: 15px; padding-top: 5px; border-radius: 0px 5px 0px 0px; background: linear-gradient(180deg, rgba(59, 69, 72, 1) 0%, rgba(22, 22, 22, 1) 100%); min-height: 60px;"></div>
+    <div class="config" style="margin-left: 15px; margin-right: 15px; padding-top: 5px; border-radius: 0px 5px 0px 0px; background: linear-gradient(rgb(59, 69, 72) 0%, rgb(22, 22, 22) 100%); min-height: 60px; display: flex;"><div><div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    /* vertical-align: middle; */
+    padding-bottom: 10px;
+    padding-left: 5px;
+">Instance Name</div><input type="text" id="editinstname" style="
+    display: block;
+    width: 100%;
+"><div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    /* vertical-align: middle; */
+    padding-bottom: 10px;
+    padding-left: 5px;
+">Instance Description</div><input type="text" id="editinstdesc" style="
+    display: block;
+    width: 100%;
+"><button id="editinstbtn" style="
+    display: block;
+    width: 100%;
+    height: 30px;
+    margin-top: 15px;
+">update instance info</button>
+<div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    /* vertical-align: middle; */
+    padding-bottom: 10px;
+    padding-left: 5px;
+    padding-top: 20px;
+">Launch Args</div><input type="text" id="launchArgsEdit" style="
+    display: block;
+    width: 100%;
+">
+<button id="editLA" style="
+    display: block;
+    width: 100%;
+    height: 30px;
+    margin-top: 15px;
+">update launch args</button>
+<div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    /* vertical-align: middle; */
+    padding-bottom: 10px;
+    padding-left: 5px;
+    padding-top: 20px;
+">Allowed Users (Discord IDs seperated by ',')</div><input type="text" id="accessEditInput" style="
+    display: block;
+    width: 100%;
+">
+<button id="editAccess" style="
+    display: block;
+    width: 100%;
+    height: 30px;
+    margin-top: 15px;
+">update access</button>
+</div></div>
+    <div class="backups" style="margin-left: 15px; margin-right: 15px; padding-top: 5px; border-radius: 0px 5px 0px 0px; background: linear-gradient(180deg, rgba(59, 69, 72, 1) 0%, rgba(22, 22, 22, 1) 100%); min-height: 60px;"></div>
+<div class="instances" style="margin-left: 15px; margin-right: 15px; padding-top: 5px; border-radius: 0px 5px 0px 0px; background: linear-gradient(rgb(59, 69, 72) 0%, rgb(22, 22, 22) 100%); min-height: 60px; display: flex;"><div style="
+    width: 100%;
+    display: block;
+    height: calc(100vh - 150px);
+    /* background: blue; */
+    display: flex;
+"><div style="
+    width: 350px;
+    height: 340px;
+    background: #282828;
+    /* margin: 5px; */
+    display: inline-flex;
+    padding: 5px;
+    border-radius: 5px;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: center;
+    justify-content: center;
+    margin: 5px;
+"><div style="
+    width: 100%;
+    height: 40px;
+    text-align: center;
+    vertical-align: middle;
+    padding-bottom: 20px;
+">Instance Creator</div><div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    /* vertical-align: middle; */
+    padding-bottom: 10px;
+    padding-left: 5px;
+">Name</div><input type="text" id="newinsttitle" style="
+    display: block;
+    width: 100%;
+"><div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    vertical-align: middle;
+    padding-bottom: 10px;
+    padding-left: 5px;
+">Description</div><input type="text" id="newinstdesc" style="
+    display: block;
+    width: 100%;
+    height: 60px;
+"><div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    vertical-align: middle;
+    padding-bottom: 10px;
+    padding-left: 5px;
+">Jar file</div><input id="newinstjar" label="choose a jar file" type="file" style="
+    display: block;
+    width: 100%;
+"><button id="newinstbtn" style="
+    display: block;
+    width: 100%;
+    height: 30px;
+    margin-top: 15px;
+">create new instance</button></div><div id="instances" style="
+    background: #282828;
+    /* max-height: calc(100vh - 200px); */
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    padding:10px;
+    display: inline-flex;
+    width: max-content;
+    width: calc(100% - 390px);
+    position: relative;
+    /* top: 13px; */
+    border-radius: 5px;
+    margin: 5px;
+"></div>
+</div>
+</div>
+    </div>
+
+
+
+<script>
+/* ---------------------------
+   Frontend logic - single-file
+   --------------------------- */
+const ramFill = document.getElementById('ram-fill');
+const cpuFill = document.getElementById('cpu-fill');
+const consoleOutput = document.getElementById('console-output');
+const consoleInput = document.getElementById('console-input');
+
+const startBtn = document.getElementById('start-btn');
+const stopBtn = document.getElementById('stop-btn');
+const restartBtn = document.getElementById('restart-btn');
+const sendBtn = document.getElementById('send-btn');
+
+const fileListEl = document.getElementById('file-list');
+const fileUploadEl = document.getElementById('file-upload');
+const uploadBtn = document.getElementById('upload-btn');
+const createBtn = document.getElementById('create-btn');
+const newFileNameEl = document.getElementById('new-file-name');
+const refreshBtn = document.getElementById('refresh-btn');
+let currentTab = 0;
+
+let accessToken = "";
+if(window.location.href.includes("code="))
+{
+  accessToken = window.location.href.split('code=')[1].split('&')[0];
+  localStorage.setItem('oauth-token', accessToken);
+  window.location.href = window.location.origin;
+}
+
+let curinstname = "";
+
+fetch("/currentInstInfo", {
+  method: 'GET'
+}).then(res => {
+  return res.json().then(data => {
+    curinstname = data.name;
+  });
+});
+
+function updateTabs()
+{
+  let i = 0
+  for(i = 0; i < document.getElementsByClassName("tab").length; i++){
+    if(i == currentTab){
+      document.getElementsByClassName("tab")[i].style.background = "#3b4548";
+      document.getElementsByClassName("tab")[i].style.paddingTop = "0.3%";
+      document.getElementsByClassName(document.getElementsByClassName("tab")[i].innerText)[0].style.display = "flex";
+    }
+    else{
+      document.getElementsByClassName("tab")[i].style.background = "#282828";
+      document.getElementsByClassName("tab")[i].style.paddingTop = "0.03%";
+      document.getElementsByClassName(document.getElementsByClassName("tab")[i].innerText)[0].style.display = "none";
+    }
+  }
+  if(currentTab == 4){
+    loadInstances();
+  }
+
+  if(currentTab == 2){
+    setConfInfoInst();
+    setLA();
+    setAccess();
+  }
+
+fetch("/currentInstInfo", {
+  method: 'GET'
+}).then(res => {
+  return res.json().then(data => {
+    curinstname = data.name;
+  });
+});
+}
+
+updateTabs();
+
+function generateRandomString() {
+	let randomString = '';
+	const randomNumber = Math.floor(Math.random() * 10);
+
+	for (let i = 0; i < 20 + randomNumber; i++) {
+		randomString += String.fromCharCode(33 + Math.floor(Math.random() * 94));
+	}
+
+	return randomString;
+}
+
+window.onload = () => {
+	// ...
+	if (accessToken == "") {
+
+    if(localStorage.getItem('oauth-token') != null){
+      accessToken = localStorage.getItem('oauth-token');
+      document.getElementById("refresh-btn").click();
+    }
+    else
+    {
+window.open(window.location.origin + "/discordLogin");
+    }
+
+		
+	}
+  cancelEdit();
+};
+
+
+function getPasswordHeader(){
+  const pw = accessToken || '';
+  return { 'X-Password': pw };
+}
+
+/* ---------- usage update ---------- */
+async function updateUsage(){
+  try {
+    const [rres, cres] = await Promise.all([fetch('/ram-usage'), fetch('/cpu-usage')]);
+
+    // RAM
+    let rjson = await rres.json();
+    const usedPercent = Math.min(100, ((rjson.usedRAM || 0) / (rjson.totalRAM || 1)) * 100);
+
+    // CPU
+    // backend returns { calculatedCpuUsage: N }
+    let cjson = await cres.json();
+    const cpuPercentVal = Math.min(100, Number(cjson.calculatedCpuUsage || 0));
+
+    setBar(ramFill, usedPercent);
+    setBar(cpuFill, cpuPercentVal);
+  } catch (err){
+    console.warn('Usage update failed', err);
+  }
+}
+
+function setBar(el, percent){
+  // bottom-up fill
+  el.style.width = percent.toFixed(1) + '%';
+  // color green -> red; compute RGB
+  const r = Math.round((percent/100) * 255);
+  const g = Math.round((1 - percent/100) * 200) + Math.round((1 - percent/100)*55);
+  el.style.background = `rgb(${r},${g},0)`;
+    console.log(el.parentNode.getAttribute("title"));
+  if(el.parentNode.getAttribute("title") == "CPU")
+  {
+    document.getElementById("cpu-percent").textContent = percent.toFixed(1) + "% CPU";
+  }
+  else{
+    document.getElementById("ram-percent").textContent = percent.toFixed(1) + "% RAM";
+  }
+}
+
+/* start periodic usage updates */
+updateUsage();
+setInterval(updateUsage, 1000);
+
+/* ---------- server control buttons ---------- */
+startBtn.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/terminal?cmd=start', { headers: getPasswordHeader() });
+    const text = await res.text();
+    appendConsole(`[ctrl] ${text}\n`);
+  } catch(err){ appendConsole(`[ctrl error] ${err}\n`); }
+});
+
+stopBtn.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/terminal?cmd=stop', { headers: getPasswordHeader() });
+    const text = await res.text();
+    appendConsole(`[ctrl] ${text}\n`);
+  } catch(err){ appendConsole(`[ctrl error] ${err}\n`); }
+});
+
+restartBtn.addEventListener('click', async () => {
+  try {
+    await fetch('/terminal?cmd=stop', { headers: getPasswordHeader() });
+    appendConsole('[ctrl] sent stop, restarting...\n');
+    setTimeout(async ()=> {
+      const r = await fetch('/terminal?cmd=start', { headers: getPasswordHeader() });
+      appendConsole('[ctrl] ' + (await r.text()) + '\n');
+    }, 1800);
+  } catch(err){ appendConsole(`[ctrl error] ${err}\n`); }
+});
+
+
+/* ---------- WebSocket console ---------- */
+let ws;
+function setupWs() {
+  try {
+    const schem = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(schem + '://' + location.host);
+
+    ws.addEventListener('open', () => {
+      appendConsole('[ws] connected\n');
+      // Send authentication with current password
+      const pw = getPasswordHeader()['X-Password'] || '';
+      ws.send(JSON.stringify({ type: 'auth', password: pw }));
+    });
+
+    ws.addEventListener('message', ev => {
+      try {
+        const obj = JSON.parse(ev.data);
+        if(obj.type === 'console') appendConsole(obj.data);
+        else if(obj.type === 'info')
+        {
+          appendConsole(`[info] ${obj.data}\n`);
+          if(obj.data == "Authorized. Console access granted." && document.getElementById("login-btn").style.display != "none")
+        {
+          document.getElementById("login-btn").style.display = "none";
+        }
+        }
+        else if(obj.type === 'auth') {
+          appendConsole(`[auth] ${obj.success ? 'Authenticated' : 'Failed'}\n`);
+        }
+        else appendConsole(String(ev.data));
+      } catch(e){
+        appendConsole(String(ev.data));
+      }
+    });
+
+    ws.addEventListener('close', () => appendConsole('[ws] disconnected\n'));
+    ws.addEventListener('error', e => appendConsole('[ws] error\n'));
+  } catch(e){
+    appendConsole('[ws setup failed]\n');
+  }
+}
+
+setupWs();
+
+function appendConsole(text) {
+  const lines = text.split(/\r?\n/); // split by newlines
+  for (const line of lines) {
+    if (line.trim() === '') continue; // skip empty lines
+
+    const p = document.createElement('p');
+    p.style.margin = '0';
+    p.style.whiteSpace = 'pre-wrap';
+    p.style.fontFamily = 'monospace';
+
+    // Determine color based on log level
+    if (line.startsWith('[')) {
+      if (line.includes('INFO')) {
+        p.style.color = '#FFFFFF'; // green
+      } else if (line.includes('WARN')) {
+        p.style.color = '#FFB347'; // orange
+      } else if (line.includes('ERROR')) {
+        p.style.color = '#FF4C4C'; // red
+      } else {
+        p.style.color = '#FFFFFF'; // default white if other tag
+      }
+    } else {
+      p.style.color = '#FFFFFF'; // plain text without brackets
+    }
+
+    p.textContent = line;
+    consoleOutput.appendChild(p);
+  }
+
+  // Auto-scroll to bottom
+  consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+/* ---------- Terminal /login command ---------- */
+
+
+/* send console input to server via WS (if available) or fallback to /terminal?cmd=... */
+async function sendConsoleInput(txt) {
+  if (!txt) return;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'cmd', password: getPasswordHeader()['X-Password'] || '', data: txt }));
+  } else {
+    // fallback: HTTP
+    try {
+      const res = await fetch('/terminal?cmd=' + encodeURIComponent(txt), {
+        headers: { 'X-Password': getPasswordHeader()['X-Password'] || '' }
+      });
+      const t = await res.text();
+      appendConsole('[exec fallback] ' + t + '\n');
+    } catch(e) {
+      appendConsole('[exec fallback error] ' + e + '\n');
+    }
+  }
+}
+
+
+/* console input handlers */
+consoleInput.addEventListener('keydown', async (ev) => {
+  if (ev.key === 'Enter') {
+    const v = consoleInput.value.trim();
+    if (!v) return;
+    appendConsole('> ' + v + '\n');
+
+    // Check if it's a login command
+    
+   sendConsoleInput(v);
+    
+
+    consoleInput.value = '';
+  }
+});
+
+sendBtn.addEventListener('click', async () => {
+  const v = consoleInput.value.trim();
+  if (!v) return;
+  appendConsole('> ' + v + '\n');
+
+  
+    sendConsoleInput(v);
+  
+
+  consoleInput.value = '';
+});
+
+/* ---------- File browser ---------- */
+let currentPath = ''; // track current directory
+
+async function loadFiles(path = '') {
+  try {
+    // Ensure path is a string
+    if (typeof path !== 'string') path = '';
+
+    fileListEl.textContent = 'Loading...';
+    const res = await fetch(`/files?path=${encodeURIComponent(path)}`, {
+      headers: getPasswordHeader()
+    });
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+
+    const files = await res.json();
+    if (!Array.isArray(files)) throw new Error('Expected an array from server');
+
+    renderFileList(files, path); // pass current path
+    currentFolder = path;
+    document.getElementById("pathDisplay").textContent = "Server Files [root/" + path + "]";
+  } catch (err) {
+    fileListEl.textContent = 'Fetch error: ' + err.message;
+  }
+}
+
+
+
+
+
+
+
+
+/* upload */
+uploadBtn.addEventListener('click', async () => {
+  const file = fileUploadEl.files[0];
+  if (!file) return alert('Select a file to upload');
+
+  // Use currentPath as target folder
+  const uploadPath = currentPath ? `${currentPath}/` : '';
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch(`/files/upload/${encodeURIComponent(uploadPath)}`, {
+      method: 'POST',
+      headers: { 'X-Password': getPasswordHeader()['X-Password'] || '' },
+      body: form
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+    alert('Upload successful');
+    fileUploadEl.value = '';
+    loadFiles(currentPath);
+  } catch (err) {
+    alert('Upload failed: ' + err.message);
+  }
+});
+
+const createinstbutton = document.getElementById('newinstbtn');
+
+createinstbutton.addEventListener('click', async () => {
+  const file = document.getElementById('newinstjar').files[0];
+  if (!file) return alert('Select a file to upload');
+
+  // Use currentPath as target folder
+  const name1 = document.getElementById('newinsttitle').value.trim();
+  const desc = document.getElementById('newinstdesc').value.trim();
+  console.log(name1);
+  const form = new FormData();
+  form.append('file', file);
+  form.append('name', name1);
+  form.append('description', desc);
+
+  try {
+    const res = await fetch(`/instanceCreate`, {
+      method: 'POST',
+      headers: { 'X-Password': getPasswordHeader()['X-Password'] || '' },
+      body: form
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+    alert('Upload successful');
+    fileUploadEl.value = '';
+    loadFiles(currentPath);
+  } catch (err) {
+    alert('Upload failed: ' + err.message);
+  }
+});
+
+
+/* create file */
+createBtn.addEventListener('click', async () => {
+  const name = newFileNameEl.value.trim();
+  if (!name) return alert('Enter file name');
+
+  // Combine current directory with file name if inside a folder
+  const fullPath = currentPath ? `${currentPath}/${name}` : name;
+
+  try {
+    const res = await fetch('/files/create', {
+      method: 'POST',
+      headers: Object.assign(
+        { 'Content-Type': 'application/json' },
+        { 'X-Password': getPasswordHeader()['X-Password']  || '' }
+      ),
+      body: JSON.stringify({ name: fullPath, content: '' }) // use full path
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+
+    newFileNameEl.value = '';
+    loadFiles(currentPath); // reload current directory
+  } catch (err) {
+    alert('Create failed: ' + err.message);
+  }
+});
+
+
+/* refresh */
+refreshBtn.addEventListener('click', loadFiles);
+
+/* initial load */
+loadFiles();
+
+/* reconnect WS on page focus or error (helpful if server restarts) */
+window.addEventListener('focus', () => {
+  if(!ws || ws.readyState === WebSocket.CLOSED) setupWs();
+});
+
+document.getElementById("editinstbtn").addEventListener('click', async () => {
+  fetch("/instanceEdit", {
+    method: 'POST',
+    headers: { 'X-Password': getPasswordHeader()['X-Password'] || '', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: curinstname, newname: document.getElementById("editinstname").value.trim(), newdesc: document.getElementById("editinstdesc").value.trim() })
+  }).then(res => {
+    if (res.ok){
+      alert('Edit successful');
+      loadFiles(currentPath);
+      updateTabs();
+    }
+    
+  })
+})
+
+function setConfInfoInst()
+{
+  fetch("/currentInstInfo", {
+    method: 'GET'
+  }).then(res => {
+    return res.json().then(data => {
+      document.getElementById("editinstname").value = data.name;
+      document.getElementById("editinstdesc").value = data.desc;
+    });
+  })
+}
+
+/* ---------- File edit, rename/move ---------- */
+let currentEditFile = null;
+
+async function editFile(fileName) {
+  try {
+    // Compute full path (include folder if in a subdirectory)
+    const fullPath = currentPath ? `${currentPath}/${fileName}` : fileName;
+
+    const res = await fetch(`/files/read/${encodeURIComponent(fullPath)}`, {
+      headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+
+    const content = await res.text();
+
+    currentEditFile = fullPath; // track full relative path
+    fileEditor.value = content;
+    fileEditor.style.display = 'block';
+    editorControls.style.display = 'flex';
+    document.getElementById("editor-filename").textContent = fileName;
+  } catch (err) {
+    alert('Edit failed: ' + err.message);
+  }
+}
+
+async function saveFile() {
+  if (!currentEditFile) return alert('No file selected for editing.');
+
+  try {
+    const res = await fetch(`/files/save/${encodeURIComponent(currentEditFile)}`, {
+      method: 'POST',
+      headers: Object.assign(
+        { 'Content-Type': 'application/json' },
+        { 'X-Password': getPasswordHeader()['X-Password'] || '' }
+      ),
+      body: JSON.stringify({ content: fileEditor.value })
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+
+    fileEditor.style.display = 'none';
+    editorControls.style.display = 'none';
+    currentEditFile = null;
+
+    loadFiles(currentPath); // reload current folder
+  } catch (err) {
+    alert('Save failed: ' + err.message);
+  }
+}
+
+function cancelEdit() {
+  fileEditor.style.display = 'none';
+  editorControls.style.display = 'none';
+  currentEditFile = null;
+}
+
+
+
+
+// Move a file
+async function renameFile(fileName){
+  const filepath = currentFolder ? currentFolder + '/' + fileName : fileName;
+  const newName = prompt('Enter new name for ' + fileName, fileName);
+  if (!newName || newName === fileName) return;
+  const newPath = currentFolder ? currentFolder + '/' + newName : newName;
+
+  const res = await fetch('/files/rename', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'X-Password': getPasswordHeader()['X-Password'] || '' },
+    body: JSON.stringify({ filepath, newPath })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  loadFiles(currentFolder);
+}
+
+async function moveFile(fileName) {
+  // Full path to the current file (includes current folder if any)
+  const filepath = currentPath ? `${currentPath}/${fileName}` : fileName;
+
+  // Ask user for the destination path (relative to /server)
+  let newPath = prompt(
+    'Enter new path relative to /server for ' + fileName,
+    filepath
+  );
+
+  if (!newPath || newPath === filepath) return; // cancelled or same path
+
+  // Ensure that if the user selected a directory, the file name is appended
+  if (!newPath.includes('.')) {
+    newPath = newPath.endsWith('/') ? newPath + fileName : newPath + '/' + fileName;
+  }
+
+  try {
+    // Check if the destination exists first
+    const checkRes = await fetch(`/files?path=${encodeURIComponent(newPath)}`, {
+      headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
+    });
+
+    if (checkRes.ok) {
+      const destFiles = await checkRes.json().catch(() => []);
+      if (destFiles.length > 0) {
+        if (!confirm(`Destination already exists. Overwrite ${newPath}?`)) return;
+      }
+    }
+
+    const res = await fetch('/files/rename', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Password': getPasswordHeader()['X-Password']  || ''
+      },
+      body: JSON.stringify({
+        filepath,  // source
+        newPath    // destination
+      })
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+
+    // Reload folder appropriately
+    if (newPath.startsWith(currentPath)) {
+      loadFiles(currentPath); // still in current folder
+    } else {
+      const parts = newPath.split('/');
+      parts.pop(); // load folder containing moved file
+      loadFiles(parts.join(''));
+    }
+
+  } catch (err) {
+    alert('Move failed: ' + err.message);
+  }
+}
+
+function setLA()
+{
+  let la = document.getElementById("launchArgsEdit");
+  fetch("/instanceGetArgs", {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'X-Password': getPasswordHeader()['X-Password'] || '' },
+    body: JSON.stringify({name: curinstname })
+  }
+  ).then((res) => {
+    return res.json().then(data => {
+      la.value = data.args;
+    });
+  })
+}
+
+document.getElementById("editLA").addEventListener("click", () => {
+  let la = document.getElementById("launchArgsEdit").value;
+  fetch("/instanceEditArgs", {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'X-Password': getPasswordHeader()['X-Password'] || '' },
+    body: JSON.stringify({args: la, name: curinstname })
+  }).then(() => {
+    updateTabs();
+  })
+})
+
+function setAccess()
+{
+  let la = document.getElementById("accessEditInput");
+  fetch("/getAccess", {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'X-Password': getPasswordHeader()['X-Password'] || '' }
+  }
+  ).then((res) => {
+    return res.json().then(data => {
+      la.value = data.access;
+    });
+  })
+}
+
+document.getElementById("editAccess").addEventListener("click", () => {
+  let access1 = document.getElementById("accessEditInput").value;
+  fetch("/editAccess", {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'X-Password': getPasswordHeader()['X-Password'] || '' },
+    body: JSON.stringify({access: access1 })
+  }).then(() => {
+    updateTabs();
+  })
+})
+
+
+
+
+async function downloadFile(fileName) {
+  try {
+    // Assume you’re tracking the current directory in a variable like `currentPath`
+    // For example: currentPath = '' (root), or 'testdir', or 'nested/dir'
+    const fullPath = currentPath 
+      ? `${currentPath}/${fileName}` 
+      : fileName;
+
+    const res = await fetch(`/files/download/${encodeURIComponent(fullPath)}`, {
+      headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName; // only the name, not full path
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Download failed: ' + err.message);
+  }
+}
+
+
+
+
+
+/* inject edit/rename/move buttons into file list */
+function renderFileList(files) {
+  fileListEl.innerHTML = '';
+
+  // Back button if not in root
+  if (currentPath && currentPath !== '') {
+    const backRow = document.createElement('div');
+    backRow.className = 'file-item';
+    const backBtn = document.createElement('button');
+    backBtn.className = 'action-btn';
+    backBtn.textContent = '⬅ Back';
+    backBtn.onclick = () => {
+      console.log("back");
+      const parts = currentPath.split('/');
+      parts.pop();
+      currentPath = parts.join('/');
+      loadFiles(currentPath);
+    };
+    backRow.appendChild(backBtn);
+    fileListEl.prepend(backRow);
+  }
+
+  
+
+  
+
+  files.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'file-item';
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    console.log(f);
+
+    // Detect if it's a directory
+    const isDir = f.isDirectory === true;
+
+    meta.textContent = `${f.name} ${isDir ? '[DIR]' : '(' + f.size + ' bytes)'}`;
+
+    const actions = document.createElement('div');
+
+    if (!isDir) {
+      // Edit button for files
+      const editBtn = document.createElement('button');
+      editBtn.className = 'action-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.onclick = () => editFile(f.name);
+      actions.appendChild(editBtn);
+
+      // Download button for files
+      const dl = document.createElement('button');
+      dl.className = 'action-btn';
+      dl.textContent = 'Download';
+      dl.onclick = () => downloadFile(f.name);
+      actions.appendChild(dl);
+
+      // Delete button
+
+
+      // Move button
+      const mv = document.createElement('button');
+      mv.className = 'action-btn';
+      mv.textContent = 'Move';
+      mv.onclick = () => moveFile(f.name);
+      actions.appendChild(mv);
+
+    } else {
+      // Open button for directories
+      const openBtn = document.createElement('button');
+      openBtn.className = 'action-btn';
+      openBtn.textContent = 'Open';
+      openBtn.onclick = () => {
+        currentPath = currentPath ? `${currentPath}/${f.name}` : f.name;
+        loadFiles(currentPath);
+      };
+      actions.appendChild(openBtn);
+    }
+
+    const del = document.createElement('button');
+del.className = 'action-btn';
+del.textContent = 'Delete';
+del.onclick = async () => {
+  if (!confirm(`Delete ${f.name}?`)) return;
+  const fullPath = currentPath ? `${currentPath}/${f.name}` : f.name;
+  try {
+    const res = await fetch(`/files/${encodeURIComponent(fullPath)}`, {
+      method: 'DELETE',
+      headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
+    });
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+    loadFiles(currentPath);
+  } catch (err) {
+    alert('Delete failed: ' + err.message);
+  }
+};
+actions.appendChild(del);
+
+
+      // Rename button
+      const ren = document.createElement('button');
+      ren.className = 'action-btn';
+      ren.textContent = 'Rename';
+      ren.onclick = () => renameFile(f.name);
+      actions.appendChild(ren);
+
+    row.appendChild(meta);
+    row.appendChild(actions);
+    fileListEl.appendChild(row);
+  });
+
+  /**if (!files || files.length === 0) {
+    fileListEl.innerHTML += '(no files)';
+    
+  }**/
+}
+
+
+async function loadInstances() {
+  try {
+    const res = await fetch('/instanceList');
+    if (!res.ok) throw new Error('Failed to fetch instance list');
+
+    const res2 = await fetch('/currentInstInfo');
+    if (!res2.ok) throw new Error('Failed to fetch current instance');
+
+    const data = await res.json();
+    const data2 = await res2.json();
+
+    const container = document.getElementById('instances');
+    container.innerHTML = ''; // clear existing elements
+
+    data.instances.forEach(inst => {
+      const card = document.createElement('div');
+      if(inst.name == data2.name)
+      {
+      card.style.border = '1px solid #ccc';
+      }
+      else
+      {
+        card.style.border = '1px solid #0f0f0f';
+      }
+      card.style.borderRadius = '5px';
+      card.style.margin = '5px';
+      card.style.background = 'url(/instanceIcon?name=' + inst.name + ') no-repeat center center / cover';
+      
+      card.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+      
+      
+      card.style.width = '200px';
+      card.style.height = '100px';
+      card.style.cursor = 'pointer';
+
+      
+
+      const fade = document.createElement('div');
+      fade.style.width = '100%';
+      fade.style.height = '100%';
+      fade.style.borderRadius = '5px';
+      fade.style.background = 'linear-gradient(180deg,rgb(40 40 40) 0%, rgba(42, 47, 48, 0) 50%, rgb(40 40 40) 100%)';
+
+      fade.addEventListener('click', () => {
+        //post to /setInstance
+        
+
+        fetch('/setInstance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json',
+                     'X-Password': getPasswordHeader()['X-Password'] || ''
+           },
+          body: JSON.stringify({ name: inst.name })
+        }).then(res => {
+          if (res.ok) {
+            updateTabs();
+            loadFiles();
+          }
+          else {
+            alert('Failed to set instance: ' + res.statusText);
+          }
+        });
+      });
+
+      const title = document.createElement('h3');
+      title.textContent = inst.name;
+      title.style.margin = '0 0 5px 0';
+      title.style.fontSize = '18px';
+      title.style.textAlign = 'center';
+
+      const desc = document.createElement('p');
+      desc.textContent = inst.description || 'No description available';
+      desc.style.margin = '0';
+      desc.style.fontSize = '14px';
+      desc.style.textAlign = 'center';
+
+      const tcontain = document.createElement('div');
+      tcontain.style.height = 'calc(100% - 30px)';
+      tcontain.style.width = '100%';
+      tcontain.style.borderRadius = '5px 5px 0px 0px';
+
+      const bcontain = document.createElement('div');
+      bcontain.style.height = '20px';
+      bcontain.style.background = '#111111';
+      bcontain.style.borderRadius = '5px';
+      bcontain.style.margin = '5px';
+      bcontain.style.display = 'flex';
+      bcontain.style.justifyContent = 'space-around';
+      bcontain.style.alignItems = 'center';
+
+      const delbtn = document.createElement('div');
+      delbtn.style.width = '35px';
+      delbtn.style.height = '15px';
+      delbtn.style.background = "red";
+      delbtn.innerHTML = "DEL";
+      delbtn.style.fontSize = '10px';
+      delbtn.style.textAlign = 'center';
+      delbtn.style.fontWeight = 'bold';
+      delbtn.style.borderRadius = '5px';
+      delbtn.addEventListener('click', () => {
+        //post to /setInstance
+        
+
+        fetch('/instanceDel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json',
+                     'X-Password': getPasswordHeader()['X-Password'] || ''
+           },
+          body: JSON.stringify({ name: inst.name })
+        }).then(() => {
+          loadInstances();
+        })
+      });
+
+      const dupebtn = document.createElement('div');
+      dupebtn.style.width = '35px';
+      dupebtn.style.height = '15px';
+      dupebtn.style.background = "brown";
+      dupebtn.style.fontSize = '10px';
+      dupebtn.style.textAlign = 'center';
+      dupebtn.style.fontWeight = 'bold';
+      dupebtn.style.borderRadius = '5px';
+      dupebtn.innerHTML = "COPY";
+      dupebtn.addEventListener('click', () => {
+        //post to /setInstance
+        
+
+        fetch('/instanceCopy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json',
+                     'X-Password': getPasswordHeader()['X-Password'] || ''
+           },
+          body: JSON.stringify({ name: inst.name })
+        }).then(() => {
+          loadInstances();
+        })
+      });
+
+      card.appendChild(fade);
+      fade.appendChild(tcontain);
+      fade.appendChild(bcontain);
+      tcontain.appendChild(title);
+      tcontain.appendChild(desc);
+      bcontain.appendChild(delbtn);
+      bcontain.appendChild(dupebtn);
+      container.appendChild(card);
+      
+    });
+
+  } catch (err) {
+    console.error('Error loading instances:', err);
+  }
+}
+
+
+/* editor control buttons */
+const fileEditor = document.getElementById('file-editor');
+const editorControls = document.getElementById('editor-controls');
+document.getElementById('save-btn').onclick=saveFile;
+document.getElementById('cancel-btn').onclick=cancelEdit;
+
+/* ===================== PASSWORD PERSISTENCE ===================== */
+function savePassword(pw) {
+  if (pw) {
+    localStorage.setItem('serverPassword', pw);
+    getPasswordHeader()['X-Password']  = pw;
+  }
+}
+
+function loadPassword() {
+  const stored = localStorage.getItem('serverPassword');
+  if (stored) getPasswordHeader()['X-Password']  = stored;
+}
+
+// Load password when page opens
+loadPassword();
+
+
+
+</script>
+</body>
+</html>

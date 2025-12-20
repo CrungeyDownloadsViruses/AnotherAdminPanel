@@ -1,0 +1,28 @@
+{
+  "name": "serverpannel",
+  "version": "1.0.0",
+  "description": "none",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "crungey",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20.11.1"
+  },
+  "dependencies": {
+    "@flmngr/flmngr-server-node-express": "^1.5.3",
+    "axios": "^1.13.2",
+    "crypto": "^1.0.1",
+    "express": "^4.21.2",
+    "express-file-manager": "^1.1.0",
+    "express-session": "^1.18.2",
+    "http": "^0.0.1-security",
+    "multer": "^1.4.5-lts.1",
+    "rcon-client": "^4.2.5",
+    "ws": "^8.18.3"
+  }
+}
