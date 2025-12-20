@@ -1,4 +1,4 @@
-# features:
+# Features:
 
 - easy to install
 
@@ -14,7 +14,7 @@
 
 - open source
 
-# preview:
+# Preview:
 
 main features:
 
@@ -30,7 +30,7 @@ plugin support (included with the source code):
 
 
 
-# installation steps:
+# Installation steps:
 ---
 ### Install NodeJS v20.11.1
 [download](https://nodejs.org/en/download/archive/v20.11.1)
