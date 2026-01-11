@@ -18,15 +18,19 @@
 
 main features:
 
-<img width="2536" height="1148" alt="image" src="https://github.com/user-attachments/assets/b1c0afe5-1a33-4f0b-92e6-bf63715a858b" />
+<img width="2532" height="1219" alt="image" src="https://github.com/user-attachments/assets/0a96c144-1523-4765-b1ce-971739ff7298" />
+
 
 multi-instance support:
 
-<img width="1247" height="594" alt="image" src="https://github.com/user-attachments/assets/f6036795-4374-4b22-92e2-f92580d6c4d5" />
+<img width="1414" height="665" alt="image" src="https://github.com/user-attachments/assets/064554ed-f0cc-4d0f-8a22-2a1cde781040" />
 
-plugin support (included with the source code):
+plugin downloader via modrinth api:
 
-<img width="2541" height="1259" alt="image" src="https://github.com/user-attachments/assets/bbb221f4-814d-4430-a104-92412494888d" />
+<img width="2528" height="1263" alt="image" src="https://github.com/user-attachments/assets/577de3bd-d3f9-408c-aa98-cf3a90f2546a" />
+
+
+and plugin support (loads anything in the plugins directory) (included with the source code)
 
 
 
