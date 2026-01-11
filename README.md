@@ -66,6 +66,10 @@ add the website you are hosting the pannel on to the application:
 <img width="336" height="97" alt="image" src="https://github.com/user-attachments/assets/fcfc4dfb-71e2-4396-8d8d-1027b09a725c" />
 
 ---
+### Install other componets
+
+navigate to the project's folder in a terminal and run ```npm install```
+
 ### Run the program
 
 if on linux, do ```cd folder_that_pannel_is_in```
