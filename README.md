@@ -14,6 +14,12 @@
 
 - open source
 
+# Upcoming:
+
+- easy to access node manager for scalability
+
+- upnp forwarding support for homelab setups
+
 # Preview:
 
 main features:
