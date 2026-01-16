@@ -60,6 +60,9 @@ async function getMyPublicIP() {
     isOnline: true,
     name: "pannel host",
   });
+  globalCurrentInst["name"] = getLatestInstance();
+  globalCurrentInst["node"] = nodes[0].name;
+  console.log(globalCurrentInst["name"] + " " + globalCurrentInst["node"]);
 }
 
 getMyPublicIP();
@@ -116,9 +119,7 @@ instancePath = path.join(
   __dirname,
   "instances/" + getLatestInstance() + "/server"
 );
-globalCurrentInst["name"] = getLatestInstance();
-globalCurrentInst["node"] = nodes[0].name;
-console.log(globalCurrentInst["name"] + " " + globalCurrentInst["node"]);
+
 
 function instanceRoot() {
   const lastFolder = path.basename(instancePath);
