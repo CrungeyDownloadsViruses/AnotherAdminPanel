@@ -222,6 +222,7 @@
       <div class="tab" onclick="currentTab = 3; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">backups</div>
       <div class="tab" onclick="currentTab = 4; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">instances</div>
      <div class="tab" onclick="currentTab = 5; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">plugin downloader</div>
+     <div class="tab" onclick="currentTab = 6; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">node manager</div>
      
     </div>
     <div class="main"
@@ -342,14 +343,13 @@
     display: flex;
 "><div style="
     width: 350px;
-    height: 340px;
     background: #282828;
     /* margin: 5px; */
     display: inline-flex;
     padding: 5px;
     border-radius: 5px;
     flex-wrap: wrap;
-    align-content: center;
+    align-content: flex-start;
     align-items: center;
     justify-content: center;
     margin: 5px;
@@ -390,7 +390,16 @@
 ">Jar file</div><input id="newinstjar" label="choose a jar file" type="file" style="
     display: block;
     width: 100%;
-"><button id="newinstbtn" style="
+"><div style="
+    width: 100%;
+    height: 20px;
+    /* text-align: center; */
+    vertical-align: middle;
+    padding-bottom: 10px;
+    padding-left: 5px;
+">Select server node</div><select name="server selector" style="width: calc(100% - 5px);" id="serverSelect">
+
+  </select><button id="newinstbtn" style="
     display: block;
     width: 100%;
     height: 30px;
@@ -409,6 +418,8 @@
     /* top: 13px; */
     border-radius: 5px;
     margin: 5px;
+    align-content: flex-start;
+    justify-content: space-between;
 "></div>
 </div>
 </div>
@@ -425,13 +436,12 @@
     display: inline-flex;
     padding: 5px;
     border-radius: 5px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-content: center;
     align-items: center;
     justify-content: flex-start;
     margin: 5px;
     flex-direction: column;
-	overflow-y: scroll;
 "><div style="
     width: 100%;
     height: 40px;
@@ -491,6 +501,84 @@
     </div>
 
 
+<div class="node manager" style="margin-left: 15px; margin-right: 15px; padding-top: 5px; border-radius: 0px 5px 0px 0px; background: linear-gradient(rgb(59, 69, 72) 0%, rgb(22, 22, 22) 100%); min-height: 60px; display: flex;"><div style="
+    width: 100%;
+    display: block;
+    height: calc(100vh - 150px);
+    /* background: blue; */
+    display: flex;
+"><div id="addanodebox" style="
+    width: 350px;
+    background: #282828;
+    /* margin: 5px; */
+    display: inline-flex;
+    padding: 5px;
+    border-radius: 5px;
+    flex-wrap: wrap;
+    align-content: center;
+    align-items: center;
+    justify-content: flex-start;
+    margin: 5px;
+    flex-direction: column;
+"><div style="
+    width: 100%;
+    height: 40px;
+    text-align: center;
+    vertical-align: middle;
+    padding-bottom: 20px;
+">Add a node:</div><input type="text" id="addanodeip" placeholder="node ip" style="
+    display: block;
+    width: calc(100% - 30px);
+">
+<input type="text" id="addanodesecret" placeholder="node secret" style="
+    display: block;
+    width: calc(100% - 30px);
+    margin-top: 10px;
+">
+<input type="text" id="addnodename" placeholder="node name" style="
+    display: block;
+    width: calc(100% - 30px);
+    margin-top: 10px;
+">
+<button id="addnodebtn" style="
+    display: block;
+    width: 100%;
+    height: 30px;
+    margin-top: 15px;
+">add node</button>
+</div>
+<div style="
+    width: 100%;
+    height: 100%;
+    display: block;
+">
+<div id="node-browser" style="
+    background: #282828;
+    height: calc(100vh - 180px);
+    display:flex;
+    flex-wrap: nowrap;
+    gap:10px;
+    padding:10px;
+    display: inline-flex;
+    width: 100%;
+    width: calc(100% - 40px);
+    position: relative;
+    /* top: 13px; */
+    border-radius: 5px 5px 5px 5px;
+    margin: 5px;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    flex-direction: column;
+    justify-content: flex-start;
+    
+"></div>
+</div>
+
+</div>
+
+    </div>
+
+
 
 <script>
 /* ---------------------------
@@ -513,8 +601,9 @@ const createBtn = document.getElementById('create-btn');
 const newFileNameEl = document.getElementById('new-file-name');
 const refreshBtn = document.getElementById('refresh-btn');
 let currentTab = 0;
-
+let globalNodes = [];
 let accessToken = "";
+let currentInst = [];
 if(window.location.href.includes("code="))
 {
   accessToken = window.location.href.split('code=')[1].split('&')[0];
@@ -529,8 +618,16 @@ fetch("/currentInstInfo", {
 }).then(res => {
   return res.json().then(data => {
     curinstname = data.name;
+    currentInst["name"] = curinstname;
+    currentInst["node"] = data.node;
+    currentInst["ip"] = data.ip;
+    currentInst["wsip"] = data.wsip;
+    setupWs();
   });
 });
+
+
+
 
 document.getElementById("selected-id").innerText = "Selected: " + curinstname;
 
@@ -549,8 +646,13 @@ function updateTabs()
       document.getElementsByClassName(document.getElementsByClassName("tab")[i].innerText)[0].style.display = "none";
     }
   }
+  if(currentTab == 0){
+    setupWs();
+  }
+
   if(currentTab == 4){
     loadInstances();
+    serverSelectOptions();
   }
 
   if(currentTab == 5){
@@ -563,6 +665,10 @@ function updateTabs()
     setLA();
     setAccess();
   }
+
+  if(currentTab == 6){
+      loadNodes();
+    }
 
 fetch("/currentInstInfo", {
   method: 'GET'
@@ -713,6 +819,22 @@ async function searchModrinth(query) {
 
   }
 }
+document.getElementById('addnodebtn').addEventListener('click', async () => {
+  await fetch('/linkNode', {
+    method: 'POST',
+    headers: { 'X-Password': getPasswordHeader()['X-Password'], 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ip: document.getElementById('addanodeip').value, secret: document.getElementById('addanodesecret').value, name: document.getElementById('addnodename').value })
+  }).then(res => {
+    if (res.ok){
+      alert('Node added successfully');
+      loadFiles(currentPath, currentInst["node"]);
+      updateTabs();
+    }
+    else{
+      alert('Failed to add node');
+    }
+  });
+});
 
 async function mrdlforward(url)
 {
@@ -735,8 +857,24 @@ async function mrdlforward(url)
 
         console.log(`Sending download URL to /mrdl: ${downloadUrl}`);
 
-        // Send to your /mrdl endpoint
-        const postResponse = await fetch("/mrdl", {
+        if(currentInst["node"] != null)
+        {
+          let newurl = '/proxy/' + currentInst["node"] + '/mrdl';
+            const postResponse = await fetch(newurl, {
+            method: "POST",
+            headers: {'X-Password': getPasswordHeader()['X-Password'], 'Content-Type': 'application/json'},
+            body: JSON.stringify({ link: downloadUrl })
+          });
+
+          if (!postResponse.ok) {
+            console.error("Failed to send to /mrdl:", postResponse.status);
+          } else {
+            alert("Download successful");
+          }
+        }
+        else
+        {
+          const postResponse = await fetch("/mrdl", {
           method: "POST",
           headers: {'X-Password': getPasswordHeader()['X-Password'], 'Content-Type': 'application/json'},
           body: JSON.stringify({ link: downloadUrl })
@@ -747,15 +885,29 @@ async function mrdlforward(url)
         } else {
           alert("Download successful");
         }
+        }
+
+        // Send to your /mrdl endpoint
+        
 }
 
 async function showpluginfolderside()
 {
   //get items from plugin folder
   let path = "plugins";
+  let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/files?path=${encodeURIComponent(path)}`;
+    }
+    else
+    {
+      newurl = `/files?path=${encodeURIComponent(path)}`;
+    }
 
     //fileListEl.textContent = 'Loading...';
-    const res = await fetch(`/files?path=${encodeURIComponent(path)}`, {
+    const res = await fetch(newurl, {
       headers: getPasswordHeader()
     });
     if (!res.ok) throw new Error(await res.text().catch(() => res.status));
@@ -824,7 +976,7 @@ async function showpluginfolderside()
       openBtn.style.marginRight = '5px';
       openBtn.onclick = () => {
         currentPath = currentPath ? `${currentPath}/${f.name}` : f.name;
-        loadFiles(currentPath);
+        loadFiles(currentPath, currentInst["node"]);
       };
       //actions.appendChild(openBtn);
     }
@@ -837,7 +989,17 @@ del.onclick = async () => {
   if (!confirm(`Delete ${f.name}?`)) return;
   const fullPath = "plugins" ? `${"plugins"}/${f.name}` : f.name;
   try {
-    const res = await fetch(`/files/${encodeURIComponent(fullPath)}`, {
+    let newurl2 = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl2 = '/proxy/' + currentInst["node"] + `/files/${encodeURIComponent(fullPath)}`;
+    }
+    else
+    {
+      newurl2 = `/files/${encodeURIComponent(fullPath)}`;
+    }
+    const res = await fetch(newurl2, {
       method: 'DELETE',
       headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
     });
@@ -933,12 +1095,33 @@ async function updateUsage(){
       showpluginfolderside();
     }
 
+    
+    loadNodes();
+    
+
+    
+
     document.getElementById("selected-id").innerText = "Selected: " + curinstname;
 
-    loadFiles(currentPath);
+    loadFiles(currentPath, currentInst["node"]);
 
   } catch (err){
     console.warn('Usage update failed', err);
+  }
+}
+
+async function serverSelectOptions(){
+  let sel = document.getElementById("serverSelect");
+  let json = globalNodes;
+  sel.innerHTML = "";
+  for (let i = 0; i < json.length; i++) {
+    let opt = document.createElement("option");
+    opt.value = json[i].name;
+    opt.innerText = json[i].name;
+    if(json[i].isOnline == true){
+      sel.appendChild(opt);
+    }
+    
   }
 }
 
@@ -966,7 +1149,17 @@ setInterval(updateUsage, 1000);
 /* ---------- server control buttons ---------- */
 startBtn.addEventListener('click', async () => {
   try {
-    const res = await fetch('/terminal?cmd=start', { headers: getPasswordHeader() });
+    let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/terminal?cmd=start`;
+    }
+    else
+    {
+      newurl = '/terminal?cmd=start';
+    }
+    const res = await fetch(newurl, { headers: getPasswordHeader() });
     const text = await res.text();
     appendConsole(`[ctrl] ${text}\n`);
   } catch(err){ appendConsole(`[ctrl error] ${err}\n`); }
@@ -974,7 +1167,17 @@ startBtn.addEventListener('click', async () => {
 
 stopBtn.addEventListener('click', async () => {
   try {
-    const res = await fetch('/terminal?cmd=stop', { headers: getPasswordHeader() });
+    let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/terminal?cmd=stop`;
+    }
+    else
+    {
+      newurl = '/terminal?cmd=stop';
+    }
+    const res = await fetch(newurl, { headers: getPasswordHeader() });
     const text = await res.text();
     appendConsole(`[ctrl] ${text}\n`);
   } catch(err){ appendConsole(`[ctrl error] ${err}\n`); }
@@ -982,10 +1185,20 @@ stopBtn.addEventListener('click', async () => {
 
 restartBtn.addEventListener('click', async () => {
   try {
-    await fetch('/terminal?cmd=stop', { headers: getPasswordHeader() });
+    let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"];
+    }
+    else
+    {
+      newurl = ''
+    }
+    await fetch(newurl + '/terminal?cmd=stop', { headers: getPasswordHeader() });
     appendConsole('[ctrl] sent stop, restarting...\n');
     setTimeout(async ()=> {
-      const r = await fetch('/terminal?cmd=start', { headers: getPasswordHeader() });
+      const r = await fetch(newurl + '/terminal?cmd=start', { headers: getPasswordHeader() });
       appendConsole('[ctrl] ' + (await r.text()) + '\n');
     }, 1800);
   } catch(err){ appendConsole(`[ctrl error] ${err}\n`); }
@@ -994,16 +1207,32 @@ restartBtn.addEventListener('click', async () => {
 
 /* ---------- WebSocket console ---------- */
 let ws;
+let oldWs;
+
 function setupWs() {
   try {
     const schem = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(schem + '://' + location.host);
+    let newurl = "";
 
+    if(currentInst["node"] != null)
+    {
+      newurl = currentInst["wsip"];
+    }
+    else
+    {
+      newurl = location.host;
+    }
+    if(oldWs) ws.close(); // close old connection
+    
+    ws = new WebSocket(schem + '://' + newurl);
+    oldWs = ws; // store old ws
     ws.addEventListener('open', () => {
+      console.log(schem + '://' + newurl);
       appendConsole('[ws] connected\n');
       // Send authentication with current password
       const pw = getPasswordHeader()['X-Password'] || '';
       ws.send(JSON.stringify({ type: 'auth', password: pw }));
+      console.log(`[auth] ${pw}`);
     });
 
     ws.addEventListener('message', ev => {
@@ -1034,7 +1263,7 @@ function setupWs() {
   }
 }
 
-setupWs();
+
 
 function appendConsole(text) {
   const lines = text.split(/\r?\n/); // split by newlines
@@ -1080,7 +1309,20 @@ async function sendConsoleInput(txt) {
   } else {
     // fallback: HTTP
     try {
-      const res = await fetch('/terminal?cmd=' + encodeURIComponent(txt), {
+
+      let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/terminal?cmd=`;
+    }
+    else
+    {
+      newurl = '/terminal?cmd=';
+    }
+
+
+      const res = await fetch(newurl + encodeURIComponent(txt), {
         headers: { 'X-Password': getPasswordHeader()['X-Password'] || '' }
       });
       const t = await res.text();
@@ -1123,15 +1365,18 @@ sendBtn.addEventListener('click', async () => {
 /* ---------- File browser ---------- */
 let currentPath = ''; // track current directory
 
-async function loadFiles(path = '') {
+async function loadFiles(path = '', node = null) {
   try {
     // Ensure path is a string
     if (typeof path !== 'string') path = '';
 
     //fileListEl.textContent = 'Loading...';
-    const res = await fetch(`/files?path=${encodeURIComponent(path)}`, {
-      headers: getPasswordHeader()
-    });
+    const res = await fetch(
+      node ? `/proxy/${encodeURIComponent(node)}/files?path=${encodeURIComponent(path)}` : `/files?path=${encodeURIComponent(path)}`,
+      {
+        headers: getPasswordHeader()
+      }
+    );
     if (!res.ok) throw new Error(await res.text().catch(() => res.status));
 
     const files = await res.json();
@@ -1145,7 +1390,212 @@ async function loadFiles(path = '') {
   }
 }
 
+async function loadNodes() {
+  try {
+    const res = await fetch('/nodes');
 
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+    document.getElementById('node-browser').innerHTML = '';
+    const nodes = await res.json();
+    globalNodes = nodes;
+    if (!Array.isArray(nodes)) throw new Error('Expected an array from server');
+
+    
+    for(let i = 0; i < nodes.length; i++){
+      const card = document.createElement('div');
+      
+      card.style.borderRadius = '5px';
+      card.style.margin = '5px';
+      
+      card.style.background = 'url(/server.png) no-repeat 0px center / 100px';
+      if(nodes[i].isOnline == false){
+        card.style.background = 'url(/server-off.png) no-repeat 0px center / 100px';
+      }
+      
+      card.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+      
+      card.style.width = '100%';
+      card.style.height = '100px';
+
+      
+
+      const fade = document.createElement('div');
+      fade.style.width = '100%';
+      fade.style.height = '100%';
+      fade.style.borderRadius = '5px';
+      fade.style.background = 'linear-gradient(rgb(40, 40, 40) 0%, rgb(42 47 48 / 25%) 50%, rgb(40, 40, 40) 100%)';
+
+
+      const title = document.createElement('h3');
+      title.textContent = nodes[i].name;
+      title.style.margin = '0 0 5px 0';
+      title.style.fontSize = '18px';
+      title.style.textShadow = '0px 2px 0px #000000';
+      title.style.marginLeft = '110px';
+
+      const desc = document.createElement('p');
+      desc.textContent = 'No description available';
+      desc.style.margin = '0';
+      desc.style.fontSize = '10px';
+      desc.style.textShadow = '0px 1px 0px #000000';
+      desc.style.marginLeft = '110px';
+
+      const tcontain = document.createElement('div');
+      tcontain.style.height = 'calc(100% - 50px)';
+      tcontain.style.width = '100%';
+      tcontain.style.borderRadius = '5px 5px 0px 0px';
+
+      const bcontain = document.createElement('div');
+      bcontain.style.height = '40px';
+      bcontain.style.background = '#111111';
+      bcontain.style.borderRadius = '5px';
+      bcontain.style.margin = '5px';
+      bcontain.style.display = 'flex';
+      bcontain.style.justifyContent = 'space-around';
+      bcontain.style.alignItems = 'center';
+      bcontain.style.cursor = 'auto';
+      bcontain.style.marginLeft = '110px';
+      bcontain.style.justifyContent = 'flex-start';
+
+      const dlbtn = document.createElement('div');
+      dlbtn.style.width = '200px';
+      dlbtn.style.height = '25px';
+      dlbtn.style.background = "#222";
+      dlbtn.style.fontSize = '15px';
+      dlbtn.style.textAlign = 'center';
+      dlbtn.style.fontWeight = 'bold';
+      dlbtn.style.borderRadius = '5px';
+      dlbtn.style.margin = '5px';
+      dlbtn.style.overflow = 'hidden';
+      dlbtn.style.textAlign = 'center';
+      //console.log(nodes[i].memory, nodes[i].totalMemory);
+      //console.log(nodes[i]);
+      let percent = (nodes[i].totalMemory - nodes[i].memory) / nodes[i].totalMemory * 100;
+      let r = Math.round((percent/100) * 255);
+      let g = Math.round((1 - percent/100) * 200) + Math.round((1 - percent/100)*55);
+
+      dlbtn.innerHTML = `<div style="width: 100%; position: relative; z-index: 2; font-size: 12px; margin-top: 4px;">Memory: ` + Math.round(nodes[i].memory / 10000000) / 100 + ` GB</div><div style="width: ` + (nodes[i].totalMemory - nodes[i].memory) / nodes[i].totalMemory * 100 + `%; height: 100%; background: rgb(${r},${g},0); position: relative; top: -20px;"></div>`;
+      dlbtn.style.cursor = 'auto';
+
+      const dlbtn2 = document.createElement('div');
+      dlbtn2.style.width = '200px';
+      dlbtn2.style.height = '25px';
+      dlbtn2.style.background = "#222";
+      dlbtn2.style.fontSize = '15px';
+      dlbtn2.style.textAlign = 'center';
+      dlbtn2.style.fontWeight = 'bold';
+      dlbtn2.style.borderRadius = '5px';
+      dlbtn2.style.margin = '5px';
+      dlbtn2.style.overflow = 'hidden';
+      dlbtn2.style.textAlign = 'center';
+      //console.log(nodes[i].memory, nodes[i].totalMemory);
+      //console.log(nodes[i]);
+      percent = (nodes[i].totalDiskSpace - nodes[i].diskSpace) / nodes[i].totalDiskSpace * 100;
+      r = Math.round((percent/100) * 255);
+      g = Math.round((1 - percent/100) * 200) + Math.round((1 - percent/100)*55);
+      dlbtn2.innerHTML = `<div style="width: 100%; position: relative; z-index: 2; font-size: 12px; margin-top: 4px;">Disk: ` + Math.round(nodes[i].diskSpace / 10000000) / 100 + ` GB</div><div style="width: ` + (nodes[i].totalDiskSpace - nodes[i].diskSpace) / nodes[i].totalDiskSpace * 100 + `%; height: 100%; background: rgb(${r},${g},0); position: relative; top: -20px;"></div>`;
+      dlbtn2.style.cursor = 'auto';
+      //dlbtn.setAttribute('dlid', data.hits[i].project_id);
+      /**dlbtn.addEventListener('click', () => {
+        const versionsUrl = `https://api.modrinth.com/v2/project/${dlbtn.getAttribute('dlid')}/version`;
+        mrdlforward(versionsUrl);
+        
+      });**/
+      
+      const dlbtn3 = document.createElement('div');
+      dlbtn3.style.width = '140px';
+      dlbtn3.style.height = '25px';
+      dlbtn3.style.background = "#222";
+      dlbtn3.style.fontSize = '15px';
+      dlbtn3.style.textAlign = 'center';
+      dlbtn3.style.fontWeight = 'bold';
+      dlbtn3.style.borderRadius = '5px';
+      dlbtn3.style.margin = '5px';
+      dlbtn3.style.overflow = 'hidden';
+      dlbtn3.style.textAlign = 'center';
+      //console.log(nodes[i].memory, nodes[i].totalMemory);
+      //console.log(nodes[i]);
+      
+      dlbtn3.innerHTML = `<div style="width: 100%; position: relative; z-index: 2; font-size: 12px; margin-top: 4px;">Running ` + nodes[i].processes + ` instances</div>`;
+      dlbtn3.style.cursor = 'auto';
+
+      const dlbtn4 = document.createElement('div');
+      dlbtn4.style.width = '140px';
+      dlbtn4.style.height = '25px';
+      dlbtn4.style.background = "#222";
+      dlbtn4.style.fontSize = '15px';
+      dlbtn4.style.textAlign = 'center';
+      dlbtn4.style.fontWeight = 'bold';
+      dlbtn4.style.borderRadius = '5px';
+      dlbtn4.style.margin = '5px';
+      dlbtn4.style.overflow = 'hidden';
+      dlbtn4.style.textAlign = 'center';
+      //console.log(nodes[i].memory, nodes[i].totalMemory);
+      //console.log(nodes[i]);
+      
+      dlbtn4.innerHTML = `<div style="width: 100%; position: relative; z-index: 2; font-size: 12px; margin-top: 4px;">` + nodes[i].ip + `</div>`;
+      dlbtn4.style.cursor = 'auto';
+
+      const dlbtn5 = document.createElement('div');
+      dlbtn5.style.width = '25px';
+      dlbtn5.style.height = '25px';
+      dlbtn5.style.background = "#222";
+      dlbtn5.style.fontSize = '15px';
+      dlbtn5.style.textAlign = 'center';
+      dlbtn5.style.fontWeight = 'bold';
+      dlbtn5.style.borderRadius = '5px';
+      dlbtn5.style.margin = '5px';
+      dlbtn5.style.overflow = 'hidden';
+      dlbtn5.style.textAlign = 'center';
+      //console.log(nodes[i].memory, nodes[i].totalMemory);
+      //console.log(nodes[i]);
+      
+      dlbtn5.innerHTML = `<div onclick="deleteNode('${nodes[i].name}')" style="width: calc(100% - 10px); height: calc(100% - 10px); padding: 5px; background: url(/trash.png) no-repeat center center / 20px;"></div>`;
+      dlbtn5.style.cursor = 'pointer';
+
+      const ntbtn = document.createElement('div');
+      ntbtn.style.width = '25px';
+      ntbtn.style.height = '25px';
+      ntbtn.style.backgroundColor = "#282828";
+      ntbtn.style.background = "url(/mr.png) no-repeat center center / cover";
+      ntbtn.style.fontSize = '15px';
+      ntbtn.style.textAlign = 'center';
+      ntbtn.style.fontWeight = 'bold';
+      ntbtn.style.borderRadius = '5px';
+      ntbtn.style.margin = '5px';
+      ntbtn.style.textAlign = 'center';
+      ntbtn.innerHTML = "";
+      ntbtn.style.cursor = 'pointer';
+      //ntbtn.setAttribute('slug', data.hits[i].slug);
+      /**ntbtn.addEventListener('click', () => {
+        const openurl = `https://modrinth.com/plugin/${ntbtn.getAttribute('slug')}/`;
+        window.open(openurl, '_blank');
+        
+      });**/
+
+
+      //card.appendChild(fade);
+      bcontain.appendChild(dlbtn);
+      bcontain.appendChild(dlbtn2);
+      bcontain.appendChild(dlbtn3);
+      bcontain.appendChild(dlbtn4);
+      if(i != 0)
+      {
+        bcontain.appendChild(dlbtn5);
+      }
+      
+      //bcontain.appendChild(ntbtn);
+      tcontain.appendChild(title);
+      tcontain.appendChild(desc);
+      card.appendChild(tcontain);
+      card.appendChild(bcontain);
+      document.getElementById("node-browser").appendChild(card);
+    }
+  }
+  catch (err) {
+    console.error(err);
+  }
+};
 
 
 
@@ -1163,8 +1613,19 @@ uploadBtn.addEventListener('click', async () => {
   const form = new FormData();
   form.append('file', file);
 
+  let newurl2 = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl2 = '/proxy/' + currentInst["node"] + `/files/upload/${encodeURIComponent(uploadPath)}`;
+    }
+    else
+    {
+      newurl2 = `/files/upload/${encodeURIComponent(uploadPath)}`;
+    }
+
   try {
-    const res = await fetch(`/files/upload/${encodeURIComponent(uploadPath)}`, {
+    const res = await fetch(newurl2, {
       method: 'POST',
       headers: { 'X-Password': getPasswordHeader()['X-Password'] || '' },
       body: form
@@ -1173,11 +1634,29 @@ uploadBtn.addEventListener('click', async () => {
     if (!res.ok) throw new Error(await res.text().catch(() => res.status));
     alert('Upload successful');
     fileUploadEl.value = '';
-    loadFiles(currentPath);
+    loadFiles(currentPath, currentInst["node"]);
   } catch (err) {
     alert('Upload failed: ' + err.message);
   }
 });
+
+function deleteNode(name) {
+  fetch('/unlinkNode', {
+    method: 'POST',
+    headers: { 'X-Password': getPasswordHeader()['X-Password'] || '', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name })
+  }).then(res => res.json().catch(() => res.text()))
+  .then(body => body.text().then(text => {
+    if (res.ok){
+      alert('Delete successful: ' + text);
+      updateTabs();
+    }
+    else{
+      alert('Delete failed: ' + text);
+    }
+  }))
+  
+}
 
 const createinstbutton = document.getElementById('newinstbtn');
 
@@ -1193,8 +1672,9 @@ createinstbutton.addEventListener('click', async () => {
   form.append('file', file);
   form.append('name', name1);
   form.append('description', desc);
-
-  try {
+  if(document.getElementById('serverSelect').value == globalNodes[0].name)
+  {
+    try {
     const res = await fetch(`/instanceCreate`, {
       method: 'POST',
       headers: { 'X-Password': getPasswordHeader()['X-Password'] || '' },
@@ -1204,10 +1684,30 @@ createinstbutton.addEventListener('click', async () => {
     if (!res.ok) throw new Error(await res.text().catch(() => res.status));
     alert('Upload successful');
     fileUploadEl.value = '';
-    loadFiles(currentPath);
+    loadFiles(currentPath, currentInst["node"]);
   } catch (err) {
     alert('Upload failed: ' + err.message);
   }
+  }
+  else
+  {
+try {
+    const res = await fetch(`/proxy/` + encodeURIComponent(document.getElementById('serverSelect').value) + `/instanceCreate`, {
+      method: 'POST',
+      headers: { 'X-Password': getPasswordHeader()['X-Password'] || '' },
+      body: form
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+    alert('Upload successful');
+    fileUploadEl.value = '';
+    loadFiles(currentPath, currentInst["node"]);
+  } catch (err) {
+    alert('Upload failed: ' + err.message);
+  }
+  }
+
+  
 });
 
 
@@ -1219,8 +1719,19 @@ createBtn.addEventListener('click', async () => {
   // Combine current directory with file name if inside a folder
   const fullPath = currentPath ? `${currentPath}/${name}` : name;
 
+  let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + '/files/create';
+    }
+    else
+    {
+      newurl = '/files/create';
+    }
+
   try {
-    const res = await fetch('/files/create', {
+    const res = await fetch(newurl, {
       method: 'POST',
       headers: Object.assign(
         { 'Content-Type': 'application/json' },
@@ -1232,7 +1743,7 @@ createBtn.addEventListener('click', async () => {
     if (!res.ok) throw new Error(await res.text().catch(() => res.status));
 
     newFileNameEl.value = '';
-    loadFiles(currentPath); // reload current directory
+    loadFiles(currentPath, currentInst["node"]); // reload current directory
   } catch (err) {
     alert('Create failed: ' + err.message);
   }
@@ -1258,7 +1769,7 @@ document.getElementById("editinstbtn").addEventListener('click', async () => {
   }).then(res => {
     if (res.ok){
       alert('Edit successful');
-      loadFiles(currentPath);
+      loadFiles(currentPath, currentInst["node"]);
       updateTabs();
     }
     
@@ -1285,7 +1796,18 @@ async function editFile(fileName) {
     // Compute full path (include folder if in a subdirectory)
     const fullPath = currentPath ? `${currentPath}/${fileName}` : fileName;
 
-    const res = await fetch(`/files/read/${encodeURIComponent(fullPath)}`, {
+    let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/files/read/${encodeURIComponent(fullPath)}`;
+    }
+    else
+    {
+      newurl = `/files/read/${encodeURIComponent(fullPath)}`;
+    }
+
+    const res = await fetch(newurl, {
       headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
     });
 
@@ -1306,8 +1828,19 @@ async function editFile(fileName) {
 async function saveFile() {
   if (!currentEditFile) return alert('No file selected for editing.');
 
+  let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/files/save/${encodeURIComponent(currentEditFile)}`;
+    }
+    else
+    {
+      newurl = `/files/save/${encodeURIComponent(currentEditFile)}`;
+    }
+
   try {
-    const res = await fetch(`/files/save/${encodeURIComponent(currentEditFile)}`, {
+    const res = await fetch(newurl, {
       method: 'POST',
       headers: Object.assign(
         { 'Content-Type': 'application/json' },
@@ -1322,7 +1855,7 @@ async function saveFile() {
     editorControls.style.display = 'none';
     currentEditFile = null;
 
-    loadFiles(currentPath); // reload current folder
+    loadFiles(currentPath, currentInst["node"]); // reload current folder
   } catch (err) {
     alert('Save failed: ' + err.message);
   }
@@ -1348,13 +1881,25 @@ async function renameFile(fileName){
   if (!newName || newName === fileName) return;
   const newPath = currentFolder ? currentFolder + '/' + newName : newName;
 
-  const res = await fetch('/files/rename', {
+  let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + '/files/rename';
+    }
+    else
+    {
+      newurl = '/files/rename';
+    }
+
+
+  const res = await fetch(newurl, {
     method: 'POST',
     headers: { 'Content-Type':'application/json', 'X-Password': getPasswordHeader()['X-Password'] || '' },
     body: JSON.stringify({ filepath, newPath })
   });
   if (!res.ok) throw new Error(await res.text());
-  loadFiles(currentFolder);
+  loadFiles(currentFolder, currentInst["node"]);
 }
 
 async function moveFile(fileName) {
@@ -1374,9 +1919,20 @@ async function moveFile(fileName) {
     newPath = newPath.endsWith('/') ? newPath + fileName : newPath + '/' + fileName;
   }
 
+  let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/files?path=${encodeURIComponent(newPath)}`;
+    }
+    else
+    {
+      newurl = `/files?path=${encodeURIComponent(newPath)}`;
+    }
+
   try {
     // Check if the destination exists first
-    const checkRes = await fetch(`/files?path=${encodeURIComponent(newPath)}`, {
+    const checkRes = await fetch(newurl, {
       headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
     });
 
@@ -1387,7 +1943,18 @@ async function moveFile(fileName) {
       }
     }
 
-    const res = await fetch('/files/rename', {
+    let newurl2 = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl2 = '/proxy/' + currentInst["node"] + '/files/rename';
+    }
+    else
+    {
+      newurl2 = '/files/rename';
+    }
+
+    const res = await fetch(newurl2, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1403,11 +1970,11 @@ async function moveFile(fileName) {
 
     // Reload folder appropriately
     if (newPath.startsWith(currentPath)) {
-      loadFiles(currentPath); // still in current folder
+      loadFiles(currentPath, currentInst["node"]); // still in current folder
     } else {
       const parts = newPath.split('/');
       parts.pop(); // load folder containing moved file
-      loadFiles(parts.join(''));
+      loadFiles(parts.join(''), currentInst["node"]);
     }
 
   } catch (err) {
@@ -1477,7 +2044,18 @@ async function downloadFile(fileName) {
       ? `${currentPath}/${fileName}` 
       : fileName;
 
-    const res = await fetch(`/files/download/${encodeURIComponent(fullPath)}`, {
+      let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/files/download/${encodeURIComponent(fullPath)}`;
+    }
+    else
+    {
+      newurl = `/files/download/${encodeURIComponent(fullPath)}`;
+    }
+
+    const res = await fetch(newurl, {
       headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
     });
 
@@ -1517,7 +2095,7 @@ function renderFileList(files) {
       const parts = currentPath.split('/');
       parts.pop();
       currentPath = parts.join('/');
-      loadFiles(currentPath);
+      loadFiles(currentPath, currentInst["node"]);
     };
     backRow.appendChild(backBtn);
     fileListEl.prepend(backRow);
@@ -1578,7 +2156,7 @@ function renderFileList(files) {
       openBtn.style.marginRight = '5px';
       openBtn.onclick = () => {
         currentPath = currentPath ? `${currentPath}/${f.name}` : f.name;
-        loadFiles(currentPath);
+        loadFiles(currentPath, currentInst["node"]);
       };
       actions.appendChild(openBtn);
     }
@@ -1590,13 +2168,25 @@ del.style.marginRight = '5px';
 del.onclick = async () => {
   if (!confirm(`Delete ${f.name}?`)) return;
   const fullPath = currentPath ? `${currentPath}/${f.name}` : f.name;
+
+let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/files/${encodeURIComponent(fullPath)}`;
+    }
+    else
+    {
+      newurl = `/files/${encodeURIComponent(fullPath)}`;
+    }
+
   try {
-    const res = await fetch(`/files/${encodeURIComponent(fullPath)}`, {
+    const res = await fetch(newurl, {
       method: 'DELETE',
       headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
     });
     if (!res.ok) throw new Error(await res.text().catch(() => res.status));
-    loadFiles(currentPath);
+    loadFiles(currentPath, currentInst["node"]);
   } catch (err) {
     alert('Delete failed: ' + err.message);
   }
@@ -1621,21 +2211,32 @@ actions.appendChild(del);
     
   }**/
 }
+let globalInstSearch = 0;
 
-
-async function loadInstances() {
+async function loadInstances(url) {
   try {
-    const res = await fetch('/instanceList');
+    let res = null;
+    if(url == null){
+      res = await fetch('/instanceList');
+    }
+    else
+    {
+      res = await fetch('/proxy/' + encodeURIComponent(url) + '/instanceList');
+    }
+    
     if (!res.ok) throw new Error('Failed to fetch instance list');
 
-    const res2 = await fetch('/currentInstInfo');
+    let res2Url = "/currentInstInfo";
+    const res2 = await fetch(res2Url);
     if (!res2.ok) throw new Error('Failed to fetch current instance');
 
     const data = await res.json();
     const data2 = await res2.json();
 
     const container = document.getElementById('instances');
-    container.innerHTML = ''; // clear existing elements
+    if(url == null){
+      container.innerHTML = '';
+    }
 
     data.instances.forEach(inst => {
       const card = document.createElement('div');
@@ -1649,13 +2250,18 @@ async function loadInstances() {
       }
       card.style.borderRadius = '5px';
       card.style.margin = '5px';
+      if(url == null){
       card.style.background = 'url(/instanceIcon?name=' + inst.name + ') no-repeat center center / cover';
+      }
+      else{
+        card.style.background = 'url(/proxy/' + encodeURIComponent(url) + '/instanceIcon?name=' + encodeURIComponent(inst.name) + ') no-repeat center center / cover';
+      }
       
       card.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
       
       
       card.style.width = '200px';
-      card.style.height = '100px';
+      card.style.height = '120px';
       card.style.cursor = 'pointer';
 
       
@@ -1665,11 +2271,39 @@ async function loadInstances() {
       fade.style.height = '100%';
       fade.style.borderRadius = '5px';
       fade.style.background = 'linear-gradient(180deg,rgb(40 40 40) 0%, rgba(42, 47, 48, 0) 50%, rgb(40 40 40) 100%)';
-
+      if(url)
+      {
+        fade.setAttribute('remote',url);
+      }
+      else
+      {
+        fade.setAttribute('remote','');
+      }
       fade.addEventListener('click', () => {
         //post to /setInstance
-        
-
+        if(fade.getAttribute('remote') != '')
+      {
+        fetch('/proxy/' + encodeURIComponent(fade.getAttribute('remote')) + '/setInstance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json',
+                     'X-Password': getPasswordHeader()['X-Password'] || ''
+           },
+          body: JSON.stringify({ name: inst.name })
+        }).then(res => {
+          if (res.ok) {
+            currentInst["name"] = decodeURIComponent(inst.name);
+            currentInst["node"] = fade.getAttribute('remote');
+            currentInst["ip"] = decodeURIComponent(inst.ip);
+            updateTabs();
+            loadFiles();
+          }
+          else {
+            alert('Failed to set instance: ' + res.statusText);
+          }
+        });
+      }
+      else
+      {
         fetch('/setInstance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json',
@@ -1678,6 +2312,9 @@ async function loadInstances() {
           body: JSON.stringify({ name: inst.name })
         }).then(res => {
           if (res.ok) {
+            currentInst["name"] = decodeURIComponent(inst.name);
+            currentInst["node"] = null;
+            currentInst["ip"] = decodeURIComponent(inst.ip);
             updateTabs();
             loadFiles();
           }
@@ -1685,6 +2322,9 @@ async function loadInstances() {
             alert('Failed to set instance: ' + res.statusText);
           }
         });
+      }
+
+        
       });
 
       const title = document.createElement('h3');
@@ -1700,19 +2340,31 @@ async function loadInstances() {
       desc.style.textAlign = 'center';
 
       const tcontain = document.createElement('div');
-      tcontain.style.height = 'calc(100% - 30px)';
+      tcontain.style.height = 'calc(100% - 50px)';
       tcontain.style.width = '100%';
       tcontain.style.borderRadius = '5px 5px 0px 0px';
 
       const bcontain = document.createElement('div');
       bcontain.style.height = '20px';
       bcontain.style.background = '#111111';
-      bcontain.style.borderRadius = '5px';
+      bcontain.style.borderRadius = '5px 5px 0px 0px';
       bcontain.style.margin = '5px';
+      bcontain.style.marginBottom = '0px';
       bcontain.style.display = 'flex';
       bcontain.style.justifyContent = 'space-around';
       bcontain.style.alignItems = 'center';
       bcontain.style.cursor = 'auto';
+
+      const bcontain2 = document.createElement('div');
+      bcontain2.style.height = '20px';
+      bcontain2.style.background = '#111111';
+      bcontain2.style.borderRadius = '0px 0px 5px 5px';
+      bcontain2.style.margin = '5px';
+      bcontain2.style.marginTop = '0px';
+      bcontain2.style.display = 'flex';
+      bcontain2.style.justifyContent = 'space-around';
+      bcontain2.style.alignItems = 'center';
+      bcontain2.style.cursor = 'auto';
 
       const statLight = document.createElement('div');
       statLight.style.width = '15px';
@@ -1725,13 +2377,23 @@ async function loadInstances() {
       if(inst.port != null)
       {
         statLight.style.width = '35px';
-        statLight.innerText = inst.port;
+        statLight.innerText = inst.port || "none";
         //statLight.style.webkitTextStroke = '0.5px black';
       }
       statLight.style.fontSize = '10px';
       statLight.style.textAlign = 'center';
       statLight.style.fontWeight = 'bold';
       statLight.style.borderRadius = '15px';
+
+      const statLight2 = document.createElement('div');
+      statLight2.style.width = '100px';
+      statLight2.style.height = '15px';
+      statLight2.style.background = "green";
+      statLight2.innerText = inst.node || "pannel host";
+      statLight2.style.fontSize = '10px';
+      statLight2.style.textAlign = 'center';
+      statLight2.style.fontWeight = 'bold';
+      statLight2.style.borderRadius = '15px';
 
       const delbtn = document.createElement('div');
       delbtn.style.width = '35px';
@@ -1746,8 +2408,19 @@ async function loadInstances() {
       delbtn.addEventListener('click', () => {
         //post to /setInstance
         
+        let newurl2 = "";
 
-        fetch('/instanceDel', {
+        if(fade.getAttribute('remote') != '')
+    {
+      newurl2 = '/proxy/' + fade.getAttribute('remote') + '/instanceDel';
+
+    }
+    else
+    {
+      newurl2 = '/instanceDel';
+    }
+
+        fetch(newurl2, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json',
                      'X-Password': getPasswordHeader()['X-Password'] || ''
@@ -1773,8 +2446,18 @@ async function loadInstances() {
       dupebtn.addEventListener('click', () => {
         //post to /setInstance
         
+let newurl = "";
 
-        fetch('/instanceCopy', {
+        if(fade.getAttribute('remote') != '')
+    {
+      newurl = '/proxy/' + fade.getAttribute('remote') + '/instanceCopy';
+    }
+    else
+    {
+      newurl = '/instanceCopy';
+    }
+
+        fetch(newurl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json',
                      'X-Password': getPasswordHeader()['X-Password'] || ''
@@ -1788,17 +2471,30 @@ async function loadInstances() {
       card.appendChild(fade);
       fade.appendChild(tcontain);
       fade.appendChild(bcontain);
+      fade.appendChild(bcontain2);
       tcontain.appendChild(title);
       tcontain.appendChild(desc);
       bcontain.appendChild(statLight);
       bcontain.appendChild(delbtn);
       bcontain.appendChild(dupebtn);
+      bcontain2.appendChild(statLight2);
       container.appendChild(card);
       
     });
 
   } catch (err) {
     console.error('Error loading instances:', err);
+  }
+  globalInstSearch += 1;
+  
+  if(globalNodes.length > 1 && globalInstSearch < globalNodes.length) {
+    loadInstances(encodeURIComponent(globalNodes[globalInstSearch].name));
+  }
+  else
+  {
+    if(globalInstSearch >= globalNodes.length) {
+      globalInstSearch = 0;
+    }
   }
 }
 
@@ -1830,4 +2526,3 @@ loadPassword();
 </script>
 </body>
 </html>
-
