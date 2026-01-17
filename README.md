@@ -45,8 +45,7 @@ main features:
 
 multi-instance support:
 
-<img width="2537" height="721" alt="image" src="https://github.com/user-attachments/assets/e15e46b0-debf-4c5d-960f-2359eb600de1" />
-
+<img width="2534" height="709" alt="image" src="https://github.com/user-attachments/assets/32f5fa57-59f6-4ccb-b171-5bbd07722fa1" />
 
 plugin downloader via modrinth api:
 
