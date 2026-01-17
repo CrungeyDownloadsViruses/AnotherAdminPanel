@@ -14,6 +14,8 @@ import { constrainedMemory } from "process";
 import disk from "diskusage";
 import e from "express";
 import FormData from "form-data";
+import archiver from "archiver";
+import unzipper from "unzipper";
 
 const memoryUpload = multer({ storage: multer.memoryStorage() });
 
@@ -186,7 +188,7 @@ app.all("/proxy/:node/*", memoryUpload.single("file"), async (req, res) => {
         data: dataToSend,
         params: req.query,
         responseType: "stream",
-        timeout: 5000,
+        timeout: 30000,
         validateStatus: () => true,
       });
     } catch (err) {
@@ -767,20 +769,15 @@ app.delete("/files/*", (req, res) => {
     const stats = fs.statSync(targetPath);
 
     if (stats.isDirectory()) {
-      // Only allow deleting an empty directory by default
-      const files = fs.readdirSync(targetPath);
-      if (files.length > 0) {
-        return res
-          .status(400)
-          .send("Directory is not empty. Delete files inside first.");
-      }
-      fs.rmdirSync(targetPath);
-      return res.send("Empty directory deleted successfully");
+      // Recursively delete directory and all its contents
+      fs.rmSync(targetPath, { recursive: true, force: true });
+      return res.send("Directory and all contents deleted successfully");
     } else {
       fs.unlinkSync(targetPath);
       return res.send("File deleted successfully");
     }
   } catch (e) {
+    console.error("Deletion error:", e);
     res.status(500).send("Failed to delete: " + e.message);
   }
 });
@@ -793,29 +790,29 @@ app.post("/files/upload/*", upload.single("file"), (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).send("No file uploaded");
 
-  const relPath = req.params[0]; // path after /upload/
-  if (!relPath)
-    return res.status(400).send("Specify target location after /upload/");
+  let relPath = req.params[0] || ""; // nothing after /upload/
 
   try {
-    // If path ends with '/', append original filename
-    const targetPath = relPath.endsWith("/")
-      ? `${relPath}${file.originalname}`
-      : relPath;
-    const destPath = resolvePath(targetPath);
+    // If no relPath or ends with '/', append original filename
+    if (!relPath || relPath.endsWith("/")) relPath += file.originalname;
 
+    const destPath = resolvePath(relPath);
     const parentDir = path.dirname(destPath);
+
     if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
 
     fs.renameSync(file.path, destPath);
     res.send("Upload successful");
   } catch (e) {
+    console.error("Upload error:", e);
     try {
       if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path);
     } catch (_) {}
     res.status(500).send("Failed to move uploaded file: " + e.message);
   }
 });
+
+
 
 // ===== CREATE NEW FILE ===== (use resolvePath)
 app.post("/files/create", express.json(), (req, res) => {
@@ -957,35 +954,105 @@ app.post("/files/save/*", express.json(), (req, res) => {
 });
 
 // ===== DOWNLOAD FILE =====
-app.get("/files/download/*", (req, res) => {
+app.get("/files/download/*", async (req, res) => {
   if (!checkPassword(req, res)) return;
 
-  // Capture everything after /files/download/
+  let relPath = req.params[0];
+  if (!relPath || relPath === "/") relPath = "";
+  
+  try {
+    let filePath = instancePath;
+    if(relPath != "")
+    {
+      filePath = resolvePath(relPath);
+    }
+    
+
+    if (!fs.existsSync(filePath))
+      return res.status(404).send("File not found");
+
+    const stats = fs.statSync(filePath);
+
+    if (stats.isDirectory()) {
+      // Create a temporary zip file in the system temp directory
+      const zipName = path.basename(filePath) + ".zip";
+      const tempZipPath = path.join(os.tmpdir(), `${Date.now()}-${zipName}`);
+
+      const output = fs.createWriteStream(tempZipPath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+
+      archive.pipe(output);
+      archive.directory(filePath, false);
+      archive.finalize();
+
+      output.on("close", () => {
+        res.download(tempZipPath, zipName, (err) => {
+          // Delete the temporary zip file after sending
+          fs.unlink(tempZipPath, (unlinkErr) => {
+            if (unlinkErr) console.error("Failed to delete temp zip:", unlinkErr);
+          });
+
+          if (err) {
+            console.error("Download error:", err);
+            if (!res.headersSent)
+              res.status(500).send("Failed to download zip: " + err.message);
+          }
+        });
+      });
+
+      archive.on("error", (err) => {
+        console.error("Archive error:", err);
+        res.status(500).send("Error creating zip: " + err.message);
+      });
+    } else {
+      // Handle normal file download
+      res.download(filePath, path.basename(filePath), (err) => {
+        if (err) {
+          console.error("Download error:", err);
+          if (!res.headersSent)
+            res.status(500).send("Failed to download file: " + err.message);
+        }
+      });
+    }
+  } catch (e) {
+    console.error("Download exception:", e);
+    res.status(500).send("Error processing download: " + e.message);
+  }
+});
+
+app.get("/files/extract/*", async (req, res) => {
+  if (!checkPassword(req, res)) return;
+
   const relPath = req.params[0];
   if (!relPath) return res.status(400).send("Missing file path");
 
   try {
-    // Resolve the full path safely inside SERVER_DIR (supports subdirectories)
     const filePath = resolvePath(relPath);
 
-    // Ensure the file exists
-    if (!fs.existsSync(filePath)) return res.status(404).send("File not found");
+    if (!fs.existsSync(filePath))
+      return res.status(404).send("File not found");
 
-    // Prevent downloading directories
     if (fs.statSync(filePath).isDirectory())
-      return res.status(400).send("Cannot download a directory");
+      return res.status(400).send("Cannot extract a directory");
 
-    // Send file for download
-    res.download(filePath, path.basename(filePath), (err) => {
-      if (err) {
-        console.error("Download error:", err);
-        if (!res.headersSent)
-          res.status(500).send("Failed to download file: " + err.message);
-      }
-    });
+    if (path.extname(filePath).toLowerCase() !== ".zip")
+      return res.status(400).send("File is not a ZIP archive");
+
+    const extractDir = path.dirname(filePath);
+
+    // Create read stream and unzip to directory
+    fs.createReadStream(filePath)
+      .pipe(unzipper.Extract({ path: extractDir }))
+      .on("close", () => {
+        res.send(`Successfully extracted to ${extractDir}`);
+      })
+      .on("error", (err) => {
+        console.error("Extraction error:", err);
+        res.status(500).send("Failed to extract zip: " + err.message);
+      });
   } catch (e) {
-    console.error("Download exception:", e);
-    res.status(500).send("Error processing download: " + e.message);
+    console.error("Extract exception:", e);
+    res.status(500).send("Error processing extraction: " + e.message);
   }
 });
 
@@ -1150,6 +1217,8 @@ app.post("/instanceGetArgs", (req, res) => {
     res.status(500).send("Failed to send: " + e.message);
   }
 });
+
+
 
 app.post("/editAccess", (req, res) => {
   if (!checkPassword(req, res))

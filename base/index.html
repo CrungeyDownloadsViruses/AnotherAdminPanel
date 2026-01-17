@@ -1392,7 +1392,7 @@ async function loadFiles(path = '', node = null) {
 
 async function loadNodes() {
   try {
-    const res = await fetch('/nodes');
+    const res = await fetch('/nodes', { headers: getPasswordHeader() });
 
     if (!res.ok) throw new Error(await res.text().catch(() => res.status));
     document.getElementById('node-browser').innerHTML = '';
@@ -2036,7 +2036,7 @@ document.getElementById("editAccess").addEventListener("click", () => {
 
 
 
-async function downloadFile(fileName) {
+async function downloadFile(fileName, overideNode = null) {
   try {
     // Assume you’re tracking the current directory in a variable like `currentPath`
     // For example: currentPath = '' (root), or 'testdir', or 'nested/dir'
@@ -2045,14 +2045,19 @@ async function downloadFile(fileName) {
       : fileName;
 
       let newurl = "";
-
-    if(currentInst["node"] != null)
+    if(overideNode == null)
     {
-      newurl = '/proxy/' + currentInst["node"] + `/files/download/${encodeURIComponent(fullPath)}`;
+      if(currentInst["node"] != null)
+      {
+        newurl = '/proxy/' + currentInst["node"] + `/files/download/${encodeURIComponent(fullPath)}`;
+      }
+      else
+      {
+        newurl = `/files/download/${encodeURIComponent(fullPath)}`;
+      }
     }
-    else
-    {
-      newurl = `/files/download/${encodeURIComponent(fullPath)}`;
+    else{
+      newurl = '/proxy/' + encodeURIComponent(overideNode) + `/files/download/${encodeURIComponent(fullPath)}`;
     }
 
     const res = await fetch(newurl, {
@@ -2076,7 +2081,45 @@ async function downloadFile(fileName) {
 }
 
 
+async function extractFile(fileName) {
+  try {
+    // Assume you’re tracking the current directory in a variable like `currentPath`
+    // For example: currentPath = '' (root), or 'testdir', or 'nested/dir'
+    const fullPath = currentPath 
+      ? `${currentPath}/${fileName}` 
+      : fileName;
 
+      let newurl = "";
+
+    if(currentInst["node"] != null)
+    {
+      newurl = '/proxy/' + currentInst["node"] + `/files/extract/${encodeURIComponent(fullPath)}`;
+    }
+    else
+    {
+      newurl = `/files/extract/${encodeURIComponent(fullPath)}`;
+    }
+
+    const res = await fetch(newurl, {
+      headers: { 'X-Password': getPasswordHeader()['X-Password']  || '' }
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => res.status));
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName; // only the name, not full path
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    loadFiles(currentPath, currentInst["node"]);
+  } catch (err) {
+    alert('extract failed: ' + err.message);
+  }
+}
 
 
 /* inject edit/rename/move buttons into file list */
@@ -2119,7 +2162,12 @@ function renderFileList(files) {
     meta.textContent = `${f.name} ${isDir ? '[DIR]' : '(' + f.size + ' bytes)'}`;
 
     const actions = document.createElement('div');
-
+    const dl = document.createElement('button');
+          dl.className = 'action-btn';
+          dl.textContent = 'Download';
+          dl.onclick = () => downloadFile(f.name);
+          dl.style.marginRight = '5px';
+          actions.appendChild(dl);
     if (!isDir) {
       // Edit button for files
       const editBtn = document.createElement('button');
@@ -2129,15 +2177,19 @@ function renderFileList(files) {
       editBtn.style.marginRight = '5px';
       actions.appendChild(editBtn);
 
-      // Download button for files
-      const dl = document.createElement('button');
-      dl.className = 'action-btn';
-      dl.textContent = 'Download';
-      dl.onclick = () => downloadFile(f.name);
-      dl.style.marginRight = '5px';
-      actions.appendChild(dl);
+      if(f.name.endsWith(".zip"))
+      {
+        console.log(f.name);
+        const extract = document.createElement('button');
+          extract.className = 'action-btn';
+          extract.textContent = 'Extract';
+          extract.onclick = () => extractFile(f.name);
+          extract.style.marginRight = '5px';
+          actions.appendChild(extract);
+      }
+      
 
-      // Delete button
+      
 
 
       // Move button
@@ -2376,7 +2428,7 @@ async function loadInstances(url) {
       }
       if(inst.port != null)
       {
-        statLight.style.width = '35px';
+        statLight.style.width = '80px';
         statLight.innerText = inst.port || "none";
         //statLight.style.webkitTextStroke = '0.5px black';
       }
@@ -2386,7 +2438,7 @@ async function loadInstances(url) {
       statLight.style.borderRadius = '15px';
 
       const statLight2 = document.createElement('div');
-      statLight2.style.width = '100px';
+      statLight2.style.width = '80px';
       statLight2.style.height = '15px';
       statLight2.style.background = "green";
       statLight2.innerText = inst.node || "pannel host";
@@ -2468,15 +2520,30 @@ let newurl = "";
         })
       });
 
+      const dlbtn = document.createElement('div');
+      dlbtn.style.width = '70px';
+      dlbtn.style.height = '15px';
+      dlbtn.style.background = "green";
+      dlbtn.style.fontSize = '10px';
+      dlbtn.style.textAlign = 'center';
+      dlbtn.style.fontWeight = 'bold';
+      dlbtn.style.borderRadius = '5px';
+      dlbtn.innerHTML = "DOWNLOAD";
+      dlbtn.style.cursor = 'pointer';
+      dlbtn.addEventListener('click', () => {
+        downloadFile("", inst.node);
+        })
+
       card.appendChild(fade);
       fade.appendChild(tcontain);
       fade.appendChild(bcontain);
       fade.appendChild(bcontain2);
       tcontain.appendChild(title);
       tcontain.appendChild(desc);
-      bcontain.appendChild(statLight);
       bcontain.appendChild(delbtn);
+      bcontain.appendChild(dlbtn);
       bcontain.appendChild(dupebtn);
+      bcontain2.appendChild(statLight);
       bcontain2.appendChild(statLight2);
       container.appendChild(card);
       
