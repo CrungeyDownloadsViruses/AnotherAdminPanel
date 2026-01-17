@@ -136,6 +136,14 @@ function getInstanceName() {
   return path.basename(path.dirname(instancePath));
 }
 
+function getInstNameFromPath(pth)
+{
+  //path is like E:\downloads\AnotherAdminPannel-main\AnotherAdminPannel-main\instances\test\server
+  //return test
+
+  return path.basename(path.dirname(pth));
+}
+
 let currentArgsBuffer = "";
 
 if (fs.existsSync(path.join(instanceRoot(), "cfg.json"))) {
@@ -692,6 +700,16 @@ app.get("/currentInstInfo", async (req, res) => {
       return; // Prevent double response
     }
 
+    let isOnline = false;
+    //look through all processes and match to instance names
+    for (let i = 0; i < allProcesses.length; i++) {
+      if(getInstNameFromPath(instances2[i]) == instanceDir && allProcesses[i] != "null") {
+        isOnline = true;
+        break;
+      }
+      //console.log(instances2[i] + " " + instanceDir);
+    }
+
     // Local instance logic
     const instDirPath = path.join(__dirname, "instances", instanceDir);
     if (!fs.existsSync(instDirPath)) {
@@ -709,6 +727,7 @@ app.get("/currentInstInfo", async (req, res) => {
       node: nodes[0].name,
       ip: myip + ":" + PORT,
       wsip: myip + ":" + PORT,
+      isOnline,
     });
   } catch (err) {
     console.error("[currentInstInfo] Error:", err.message);

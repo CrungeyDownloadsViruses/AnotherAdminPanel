@@ -225,6 +225,7 @@
      <div class="tab" onclick="currentTab = 6; updateTabs();" style="background: #282828; width: 150px; height: 100%; border-radius: 5px 5px 0px 0px; text-align: center; padding-top: 0.03%; display: inline-block; margin-right: 5px;">node manager</div>
      
     </div>
+    <div id="mainContent">
     <div class="main"
       style="margin-left: 15px; margin-right: 15px; padding-top: 5px; border-radius: 0px 5px 0px 0px; background: linear-gradient(180deg, rgba(59, 69, 72, 1) 0%, rgba(22, 22, 22, 1) 100%);">
       <section class="terminal" aria-label="Console">
@@ -577,6 +578,7 @@
 </div>
 
     </div>
+    </div>
 
 
 
@@ -670,6 +672,10 @@ function updateTabs()
       loadNodes();
     }
 
+    // PLUGIN_INJECTION_POINT-CurrentTabFunctions
+
+
+
 fetch("/currentInstInfo", {
   method: 'GET'
 }).then(res => {
@@ -677,6 +683,8 @@ fetch("/currentInstInfo", {
     curinstname = data.name;
   });
 });
+
+
 }
 
 updateTabs();
