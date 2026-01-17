@@ -24,9 +24,9 @@
 
 - download and upload server instances as zip files
 
-# Upcoming:
+- https and wss encryption
 
-- propper https and wss encryption (highest priority)
+# Upcoming:
 
 - upnp forwarding support for homelab setups
 
@@ -98,6 +98,12 @@ add the website you are hosting the pannel on to the application:
 
 navigate to the project's folder in a terminal and run ```npm install```
 
+### Install certs
+
+place a ```server.key``` and ```server.cert``` file in the same directory as ```run.bat``` and ```run.sh```
+
+note: this feature can be disabled by moving the ```secureRouting.js``` plugin to the ```plugins/unused``` folder
+
 ### Run the program
 
 if on linux, do ```chmod +x run.sh``` then ```./run.sh```
@@ -121,6 +127,13 @@ if on windows, launch run.bat
 ---
 ### Navigate to the ```server node``` folder
 
+---
+
+### Install certs
+
+place a ```server.key``` and ```server.cert``` file in the same directory as ```run.bat``` and ```run.sh```
+
+note: this feature can be disabled by moving the ```secureRouting.js``` plugin to the ```plugins/ignore``` folder
 
 ### Run the program
 
