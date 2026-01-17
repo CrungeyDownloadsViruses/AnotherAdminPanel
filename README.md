@@ -38,6 +38,8 @@
 
 - loading wheels for lengthy opperations
 
+- consistent css
+
 # Preview:
 
 main features:
