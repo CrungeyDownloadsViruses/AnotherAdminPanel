@@ -22,15 +22,19 @@
 
 - easy to access node manager for scalability
 
+- download and upload server instances as zip files
+
 # Upcoming:
 
 - upnp forwarding support for homelab setups
 
 - mod browser for fabric/forge/neoforge servers
 
-- download and upload server instances as zip files
-
 - move instances between servers
+
+- auto updates
+
+- loading wheels for lengthy opperations
 
 # Preview:
 
