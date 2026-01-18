@@ -7,7 +7,7 @@ import { exec, spawn } from "child_process";
 import * as url from "url";
 import http, { get } from "http";
 import { WebSocketServer } from "ws";
-import axios from "axios";
+import axios, { all } from "axios";
 import crypto from "crypto";
 import { json } from "stream/consumers";
 import { constrainedMemory } from "process";
@@ -39,6 +39,17 @@ app.use(express.urlencoded({ extended: true }));
 const interfaces = os.networkInterfaces();
 let serverIp = "0.0.0.0";
 
+let nodes = [];
+let myip = "";
+let tokens = [];
+let stringtokens = "";
+let allowedidsstring = "";
+const upload = multer({ dest: "uploads/" });
+
+let instancePath = path.join(__dirname, "instances/server/server");
+
+let currentArgs = "-Xmx10000M -Xms10000M";
+
 Object.keys(interfaces).forEach((interfaceName) => {
   interfaces[interfaceName].forEach((iface) => {
     if (iface.family === "IPv4" && !iface.internal) {
@@ -46,8 +57,6 @@ Object.keys(interfaces).forEach((interfaceName) => {
     }
   });
 });
-let nodes = [];
-let myip = "";
 async function getPublicIP() {
   const response = await fetch("https://api.ipify.org");
   return await response.text();
@@ -69,10 +78,6 @@ async function getMyPublicIP() {
 
 getMyPublicIP();
 
-let tokens = [];
-let stringtokens = "";
-
-let allowedidsstring = "";
 //discord client auth instead of a standard login. read client id and secret from loginCfg.json
 let clientId =
   JSON.parse(fs.readFileSync(path.join(__dirname, "loginCfg.json"), "utf-8"))
@@ -80,12 +85,6 @@ let clientId =
 let clientSecret =
   JSON.parse(fs.readFileSync(path.join(__dirname, "loginCfg.json"), "utf-8"))
     .clientSecret || "discord client secret";
-
-const upload = multer({ dest: "uploads/" });
-
-let instancePath = path.join(__dirname, "instances/server/server");
-
-let currentArgs = "-Xmx10000M -Xms10000M";
 
 //load file meshing.json
 let meshingFile = fs.readFileSync(
@@ -109,6 +108,7 @@ function getLatestInstance() {
     const bDate = fs.statSync(path.join(__dirname, "instances", b)).mtime;
     return bDate - aDate;
   });
+  console.log(sortedInstances[0]);
   return sortedInstances[0];
 }
 
@@ -156,9 +156,53 @@ if (fs.existsSync(path.join(instanceRoot(), "cfg.json"))) {
   currentArgs = "";
 }
 
-let status = 0;
+// Global fallback — never let an unhandled rejection crash the process
+process.on("unhandledRejection", (reason, p) => {
+  console.warn("[unhandledRejection]", reason?.code || reason?.message || reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err?.code || err?.message || String(err));
+});
 
+//check if pwd matches
+function checkPassword(req, res) {
+  const pw = req.headers["x-password"] || "";
+  if (!stringtokens.includes("," + pw + ",")) {
+    res.status(401).send("Unauthorized: wrong password");
+    console.log(stringtokens + " " + pw);
+    return false;
+  }
+  return true;
+}
 
+//random string gen
+function makeid(length, seed = "") {
+  var result = "";
+  var characters =
+    seed + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  var charactersLength = characters.length;
+  var random = crypto.createHash("sha256").update(seed).digest();
+  for (var i = 0; i < length; i++) {
+    result += characters.charAt(
+      parseInt(random.slice(i * 2, (i + 1) * 2), 16) % charactersLength
+    );
+  }
+  return result;
+}
+
+// make sure file path is inside the server
+function resolvePath(userPath) {
+  if (!userPath) throw new Error("Invalid path");
+  const fullPath = path.resolve(instancePath, userPath);
+  const relative = path.relative(instancePath, fullPath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Access denied");
+  }
+
+  return fullPath;
+}
+
+//proxy: handles requests across nodes
 app.all("/proxy/:node/*", memoryUpload.single("file"), async (req, res) => {
   const nodeName = decodeURIComponent(req.params.node);
   const targetNode = nodes.find(n => n.name === nodeName);
@@ -260,16 +304,8 @@ app.all("/proxy/:node/*", memoryUpload.single("file"), async (req, res) => {
   }
 });
 
-// Global fallback — never let an unhandled rejection crash the process
-process.on("unhandledRejection", (reason, p) => {
-  console.warn("[unhandledRejection]", reason?.code || reason?.message || reason);
-});
-process.on("uncaughtException", (err) => {
-  console.error("[uncaughtException]", err?.code || err?.message || String(err));
-});
 
-
-// ==================== SERVER CONTROL ====================
+// generate process list, null for all server instances
 let jarProcess = null;
 let allProcesses = [];
 let instances2 = fs.readdirSync(path.join(__dirname, "instances"));
@@ -278,13 +314,12 @@ for (let i = 0; i < instances2.length; i++) {
   allProcesses.push("null");
 }
 
-// Start the Minecraft server
-
+// get current selected instance
 function curInstId() {
   return instances2.indexOf(instancePath);
 }
 
-// ===== TERMINAL ENDPOINT =====
+// server start and stop commands
 app.get("/terminal", (req, res) => {
   if (!checkPassword(req, res)) return;
 
@@ -292,8 +327,12 @@ app.get("/terminal", (req, res) => {
   if (!cmd) return res.status(400).send("Missing ?cmd parameter");
 
   if (cmd === "start") {
-    if (allProcesses[curInstId()] != "null")
+    if (allProcesses[curInstId()] != "null" && allProcesses[curInstId()] != null)
+    {
+      console.log("status: " + allProcesses[curInstId()] + " " + allProcesses.length + " " + instances2.length);
       return res.send("Server already running.");
+    }
+      
 
     const jarPath = path.join(instancePath, "server.jar");
     if (!fs.existsSync(jarPath))
@@ -307,8 +346,6 @@ app.get("/terminal", (req, res) => {
         shell: true,
       }
     );
-
-    status = 1;
 
     allProcesses[curInstId()].stdout.on("data", (data) =>
       broadcastConsole(data.toString())
@@ -336,11 +373,10 @@ app.get("/terminal", (req, res) => {
   return res.status(400).send("Invalid command. Use start or stop.");
 });
 
-// ===== WEBSOCKET TERMINAL =====
+//websocket stuff
 
 const authorizedClients = new Set();
 
-// ========== WEBSOCKET TERMINAL ==========
 wss.on("connection", (ws) => {
   let isAuthorized = false;
 
@@ -405,7 +441,7 @@ wss.on("connection", (ws) => {
   });
 });
 
-// --- Broadcast console output only to authorized clients ---
+//broadcast console to authorized clients
 function broadcastConsole(message) {
   wss.clients.forEach((client) => {
     if (client.readyState === 1 && authorizedClients.has(client)) {
@@ -414,57 +450,39 @@ function broadcastConsole(message) {
   });
 }
 
-// ===== PASSWORD PROTECTION =====
-// <-- set your password here
-//const SERVER_DIR = path.join(__dirname, 'server');
+//scaling
 
-function checkPassword(req, res) {
-  const pw = req.headers["x-password"] || "";
-  if (!stringtokens.includes("," + pw + ",")) {
-    res.status(401).send("Unauthorized: wrong password");
-    console.log(stringtokens + " " + pw);
-    return false;
+//sends data to all nodes, updates what clients can connect to them
+async function sendTokensTo(ip, secret) {
+  try {
+    let tempstr = "";
+    let i = 0;
+    for (i = 0; i < tokens.length; i++) {
+      tempstr += tokens[i][0] + ",";
+    }
+    let res = await fetch("http://" + ip + "/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        secret: secret,
+      },
+      body: JSON.stringify({
+        token: tempstr,
+      }),
+    });
+  } catch (e) {
+    console.error(e);
   }
-  return true;
 }
 
-function makeid(length, seed = "") {
-  var result = "";
-  var characters =
-    seed + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  var charactersLength = characters.length;
-  var random = crypto.createHash("sha256").update(seed).digest();
-  for (var i = 0; i < length; i++) {
-    result += characters.charAt(
-      parseInt(random.slice(i * 2, (i + 1) * 2), 16) % charactersLength
-    );
-  }
-  return result;
-}
-
-// ----- secure path resolver -----
-function resolvePath(userPath) {
-  if (!userPath) throw new Error("Invalid path");
-
-  // Resolve relative to SERVER_DIR
-  const fullPath = path.resolve(instancePath, userPath);
-
-  // Ensure the resolved path is inside the server dir
-  // Use path.relative to avoid prefix-matching pitfalls (e.g. /srv/server vs /srv/server2)
-  const relative = path.relative(instancePath, fullPath);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error("Access denied");
-  }
-
-  return fullPath;
-}
-
+//sends info about each node to client
 app.get("/nodes", (req, res) => {
   if (!checkPassword(req, res)) return;
 
   res.send(JSON.stringify(nodes));
 });
 
+//links a new node
 app.post("/linkNode", (req, res) => {
   if (!checkPassword(req, res)) return;
 
@@ -492,28 +510,7 @@ app.post("/linkNode", (req, res) => {
   res.send("success");
 });
 
-async function sendTokensTo(ip, secret) {
-  try {
-    let tempstr = "";
-    let i = 0;
-    for (i = 0; i < tokens.length; i++) {
-      tempstr += tokens[i][0] + ",";
-    }
-    let res = await fetch("http://" + ip + "/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        secret: secret,
-      },
-      body: JSON.stringify({
-        token: tempstr,
-      }),
-    });
-  } catch (e) {
-    console.error(e);
-  }
-}
-
+//unlinks a node, deletes in db
 app.post("/unlinkNode", (req, res) => {
   if (!checkPassword(req, res)) return;
 
@@ -534,7 +531,7 @@ app.post("/unlinkNode", (req, res) => {
   fs.writeFileSync(path.join(__dirname, "meshing.json"), JSON.stringify(nodes.slice(1)));
 });
 
-//repeat every 5 seconds
+//repeat every 5 seconds, make sure nodes are running
 async function pingNodes() {
   try {
     const promises = nodes
@@ -602,12 +599,11 @@ async function pingNodes() {
   }
 }
 
-
-
 setInterval(async () => {
   await pingNodes();
 }, 5000);
 
+//info about the pannel as if it were a node
 app.get("/ping", (req, res) => {
   console.log("pinged");
 
@@ -666,11 +662,11 @@ app.get("/ping", (req, res) => {
   }
 });
 
-
+//info about the current instance, works even if it's on a remote node
 app.get("/currentInstInfo", async (req, res) => {
   try {
-    const instanceDir = path.basename(path.dirname(instancePath));
-    console.log(instanceDir);
+    let instanceDir = path.basename(path.dirname(instancePath));
+    console.log("instanceDir: " + instanceDir);
 
     // If the current instance is on a remote node
     if (globalCurrentInst["node"] != nodes[0].name) {
@@ -697,12 +693,22 @@ app.get("/currentInstInfo", async (req, res) => {
         console.log(`${globalCurrentInst.name} ${globalCurrentInst.node} ${nodes[0].name}`);
       }
 
-      return; // Prevent double response
+      return;
+    }
+    console.log(path.join(__dirname, "instances", instanceDir));
+    let instDirPath = path.join(__dirname, "instances", instanceDir);
+    //
+    if (!fs.existsSync(instDirPath)) {
+      instancePath = path.join(__dirname, "instances", getLatestInstance(), "server");
+      instDirPath = path.join(__dirname, "instances", getLatestInstance());
+      instanceDir = path.basename(path.dirname(instancePath));
+      console.log("reset instancePath to: " + instancePath);
     }
 
     let isOnline = false;
     //look through all processes and match to instance names
     for (let i = 0; i < allProcesses.length; i++) {
+      console.log("instances2[i]: " + instances2[i] + " " + instanceDir);
       if(getInstNameFromPath(instances2[i]) == instanceDir && allProcesses[i] != "null") {
         isOnline = true;
         break;
@@ -711,15 +717,15 @@ app.get("/currentInstInfo", async (req, res) => {
     }
 
     // Local instance logic
-    const instDirPath = path.join(__dirname, "instances", instanceDir);
-    if (!fs.existsSync(instDirPath)) {
-      instancePath = path.join(__dirname, "instances", getLatestInstance(), "server");
-    }
-
+    console.log("description path:");
+    console.log(path.join(instDirPath, "description.txt"));
     const descriptionPath = path.join(instDirPath, "description.txt");
     const description = fs.existsSync(descriptionPath)
       ? fs.readFileSync(descriptionPath, "utf-8")
       : "No description available.";
+
+    console.log(`${instanceDir} ${description} ${nodes[0].name} ${myip}:${PORT} ${myip}:${PORT} ${isOnline}`);
+    console.log("latest instance: " + getLatestInstance());
 
     res.json({
       name: instanceDir,
@@ -731,15 +737,14 @@ app.get("/currentInstInfo", async (req, res) => {
     });
   } catch (err) {
     console.error("[currentInstInfo] Error:", err.message);
-    if (!res.headersSent) res.status(500).send("Internal error retrieving instance info");
+    if (!res.headersSent) res.status(500).send("Internal error retrieving instance info. setting current instance to " + getLatestInstance());
           globalCurrentInst["name"] = getLatestInstance();
       globalCurrentInst["node"] = nodes[0].name;
   }
 });
 
 
-// List files in a directory
-// List files in a directory (now uses resolvePath)
+// List files in a directory (req.query.path)
 app.get("/files", (req, res) => {
   if (!checkPassword(req, res)) return;
 
@@ -767,7 +772,7 @@ app.get("/files", (req, res) => {
   });
 });
 
-// ===== DELETE FILE ===== (now uses resolvePath and blocks deleting server dir)
+//deletes files
 app.delete("/files/*", (req, res) => {
   if (!checkPassword(req, res)) return;
 
@@ -801,8 +806,7 @@ app.delete("/files/*", (req, res) => {
   }
 });
 
-// ===== UPLOAD FILE ===== (use resolvePath for destination file)
-// ===== UPLOAD FILE TO SPECIFIED PATH =====
+// Upload a file to this node
 app.post("/files/upload/*", upload.single("file"), (req, res) => {
   if (!checkPassword(req, res)) return;
 
@@ -833,7 +837,7 @@ app.post("/files/upload/*", upload.single("file"), (req, res) => {
 
 
 
-// ===== CREATE NEW FILE ===== (use resolvePath)
+//create a new file based on info in the request
 app.post("/files/create", express.json(), (req, res) => {
   if (!checkPassword(req, res)) return;
 
@@ -1108,7 +1112,11 @@ app.post("/instanceCreate", upload.single("file"), (req, res) => {
       path.join(baseDir, "cfg.json"),
       JSON.stringify({ args: "" })
     );
-
+    instances2 = fs.readdirSync(path.join(__dirname, "instances"));
+    for (let i = 0; i < instances2.length; i++) {
+      instances2[i] = path.join(__dirname, "instances", instances2[i], "server");
+    }
+    allProcesses.push("null");
     res.send("Upload successful");
   } catch (e) {
     res.status(500).send("Failed to upload file: " + e.message);
@@ -1176,7 +1184,10 @@ app.post("/instanceEdit", (req, res) => {
       "utf-8"
     );
     currentArgs = JSON.parse(currentArgsBuffer).args;
-
+    instances2 = fs.readdirSync(path.join(__dirname, "instances"));
+    for (let i = 0; i < instances2.length; i++) {
+      instances2[i] = path.join(__dirname, "instances", instances2[i], "server");
+    }
     res.send("Edit successful");
   } catch (e) {
     res.status(500).send("Failed to edit: " + e.message);
@@ -1273,7 +1284,7 @@ app.post("/getAccess", (req, res) => {
 app.post("/instanceCopy", upload.single("file"), (req, res) => {
   if (!checkPassword(req, res))
     return res.status(401).send("Unauthorized: wrong password");
-
+  console.log("LENGTHS:    " + instances2.length + " " + allProcesses.length);
   const name = req.body.name;
 
   if (!name) return res.status(400).send("name is required");
@@ -1296,7 +1307,12 @@ app.post("/instanceCopy", upload.single("file"), (req, res) => {
     fs.cpSync(path.join(baseDir, "cfg.json"), path.join(copyDir, "cfg.json"), {
       recursive: true,
     });
-
+    instances2 = fs.readdirSync(path.join(__dirname, "instances"));
+    for (let i = 0; i < instances2.length; i++) {
+      instances2[i] = path.join(__dirname, "instances", instances2[i], "server");
+    }
+    allProcesses.push("null");
+    console.log("LENGTHS:    " + instances2.length + " " + allProcesses.length);
     res.send("Copy successful");
   } catch (e) {
     res.status(500).send("Failed to upload file: " + e.message);
@@ -1312,7 +1328,7 @@ app.post("/instanceDel", (req, res) => {
   if (!name) return res.status(400).send("name is required");
   console.log(name);
   console.log(getInstanceName());
-  if (allProcesses[curInstId()] == null || name != getInstanceName()) {
+  if (allProcesses[curInstId()] == null || allProcesses[curInstId()] == "null" || name != getInstanceName()) {
     try {
       const baseDir = path.join(__dirname, "instances", name);
       fs.mkdirSync(path.join(baseDir, "backups", name), { recursive: true });
@@ -1328,6 +1344,20 @@ app.post("/instanceDel", (req, res) => {
         __dirname,
         "instances/" + getLatestInstance() + "/server"
       );
+      for(let i = 0; i < instances2.length; i++) {
+        console.log("instances2[i]: " + instances2[i] + " " + name);
+        if(getInstNameFromPath(instances2[i]) == name) {
+          instances2.splice(i, 1);
+          allProcesses.splice(i, 1);
+          break;
+        }
+      }
+      console.log("LENGTHS:    " + instances2.length + " " + allProcesses.length);
+      instances2 = fs.readdirSync(path.join(__dirname, "instances"));
+      for (let i = 0; i < instances2.length; i++) {
+        instances2[i] = path.join(__dirname, "instances", instances2[i], "server");
+      }
+      console.log("LENGTHS:    " + instances2.length + " " + allProcesses.length);
       res.send("Delete successful");
     } catch (e) {
       res.status(500).send("Failed to upload file: " + e.message);
