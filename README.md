@@ -28,6 +28,8 @@
 
 # Upcoming:
 
+- improve readibility, switch to react?
+
 - upnp forwarding support for homelab setups
 
 - mod browser for fabric/forge/neoforge servers
@@ -37,8 +39,6 @@
 - auto updates
 
 - loading wheels for lengthy opperations
-
-- consistent css
 
 - user management system
 
